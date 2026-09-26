@@ -370,6 +370,11 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     const identity = sec.authenticate(plant, code);
 
     if (!identity) {
+      if (!sec.hasAnyAccessCodeConfigured()) {
+        return res.status(401).json({
+          error: 'No access codes are configured in the server environment. Please set PLANT_CODE_<PLANT> or ADMIN_CODE in your environment variables.'
+        });
+      }
       await loginLimiter.countFailure(req);
       await appendLog(req, {
         plant: registers.isKnownPlant(plant) ? plant : 'Unknown',
@@ -790,8 +795,22 @@ app.get('/api/export-csv',
 // 5. STATIC PAGE & FALLBACKS
 // ============================================================================
 const INDEX_PATH = path.join(__dirname, 'Index.html');
+let indexHtmlCache = null;
 
-app.get('/', (req, res) => res.sendFile(INDEX_PATH));
+function serveIndexHtml(res) {
+  try {
+    if (!indexHtmlCache) {
+      indexHtmlCache = fs.readFileSync(INDEX_PATH, 'utf8');
+    }
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(indexHtmlCache);
+  } catch (err) {
+    console.error('Failed to load Index.html:', err);
+    return res.status(500).send('Unable to load application interface. Please verify Index.html exists.');
+  }
+}
+
+app.get('/', (req, res) => serveIndexHtml(res));
 
 // Unmatched /api/* must 404 as JSON rather than fall through to the SPA.
 app.use('/api', (req, res) => res.status(404).json({ error: 'Unknown endpoint.' }));
@@ -806,7 +825,7 @@ app.use((req, res) => {
   if (LOOKS_LIKE_FILE.test(req.path) && req.path.toLowerCase() !== '/index.html') {
     return res.status(404).json({ error: 'Not found.' });
   }
-  res.sendFile(INDEX_PATH);
+  return serveIndexHtml(res);
 });
 
 module.exports = app;
