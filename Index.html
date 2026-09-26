@@ -2355,14 +2355,17 @@
             transform: none;
         }
 
-        /* App Footer */
+        /* Enterprise Footer */
         .app-footer {
             margin-top: auto;
             border-top: 1px solid var(--border);
-            background: var(--surface);
-            padding: 14px 28px;
+            background: #FFFFFF;
+            padding: 16px 28px;
             font-size: 12px;
             color: var(--text-muted);
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.03);
+            position: relative;
+            z-index: 40;
         }
 
         .footer-wrap {
@@ -2372,7 +2375,84 @@
             align-items: center;
             justify-content: space-between;
             flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .footer-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .footer-brand-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+        }
+
+        .footer-divider-dot {
+            color: var(--border-subtle);
+        }
+
+        .footer-iso-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #0284C7;
+            background: rgba(2, 132, 199, 0.08);
+            padding: 2px 7px;
+            border-radius: 4px;
+            border: 1px solid rgba(2, 132, 199, 0.18);
+        }
+
+        .footer-credits {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .footer-actions {
+            display: flex;
+            align-items: center;
             gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .footer-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--epic-navy);
+            background: var(--surface-muted);
+            border: 1px solid var(--border);
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.18s ease;
+        }
+
+        .footer-action-btn:hover {
+            background: #E2E8F0;
+            border-color: var(--border-subtle);
+            color: var(--epic-blue);
+            transform: translateY(-1px);
+        }
+
+        .footer-live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding: 5px 8px;
         }
 
         /* Mobile Responsive Adjustments */
@@ -2920,7 +3000,10 @@
         }
 
         .cat-pill {
-            padding: 6px 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 13px;
             border-radius: 20px;
             font-size: 12px;
             font-weight: 600;
@@ -3122,20 +3205,10 @@
             </div>
         </div>
 
-        <!-- Navigation Right Bar: Audit CSV & System Cache Status -->
-        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-            <a href="/api/export-csv" class="export-audit-btn" title="Download ISO 50001 consolidated consumption audit CSV across all plants" download>
-                <i data-lucide="download" style="width:13px; height:13px;"></i>
-                <span>Audit CSV</span>
-            </a>
-            <button type="button" class="system-status-pill" onclick="openSystemHealthModal()" title="View Redis/Cache & Google Sheets API Diagnostics">
-                <span class="pulse-dot-green"></span>
-                <span id="cacheStatusLabel">Redis / Cache</span>
-            </button>
-            <div class="nav-context-status">
-                <span class="status-dot"></span>
-                <span>Live Grid</span>
-            </div>
+        <!-- Navigation Right Status Bar -->
+        <div class="nav-context-status">
+            <span class="status-dot"></span>
+            <span>Central Engineering Hub</span>
         </div>
     </header>
 
@@ -3452,11 +3525,26 @@
                     <button type="button" id="meterSearchClear" class="reg-search-clear" onclick="clearRegisterSearch()" style="display:none;">&times;</button>
                 </div>
                 <div class="category-filter-pills" id="categoryFilterPills">
-                    <button type="button" class="cat-pill active" data-category="ALL" onclick="setCategoryFilter('ALL')">All Registers</button>
-                    <button type="button" class="cat-pill" data-category="ELECTRICITY" onclick="setCategoryFilter('ELECTRICITY')">⚡ Electricity</button>
-                    <button type="button" class="cat-pill" data-category="WATER" onclick="setCategoryFilter('WATER')">💧 Water</button>
-                    <button type="button" class="cat-pill" data-category="GAS" onclick="setCategoryFilter('GAS')">🔥 Gas &amp; Fuel</button>
-                    <button type="button" class="cat-pill" data-category="STEAM" onclick="setCategoryFilter('STEAM')">💨 Steam</button>
+                    <button type="button" class="cat-pill active" data-category="ALL" onclick="setCategoryFilter('ALL')">
+                        <i data-lucide="layers" style="width:13px;height:13px;"></i>
+                        <span>All Registers</span>
+                    </button>
+                    <button type="button" class="cat-pill" data-category="ELECTRICITY" onclick="setCategoryFilter('ELECTRICITY')">
+                        <i data-lucide="zap" style="width:13px;height:13px; color:#0284C7;"></i>
+                        <span>Electricity</span>
+                    </button>
+                    <button type="button" class="cat-pill" data-category="WATER" onclick="setCategoryFilter('WATER')">
+                        <i data-lucide="droplet" style="width:13px;height:13px; color:#0D9488;"></i>
+                        <span>Water</span>
+                    </button>
+                    <button type="button" class="cat-pill" data-category="GAS" onclick="setCategoryFilter('GAS')">
+                        <i data-lucide="flame" style="width:13px;height:13px; color:#D97706;"></i>
+                        <span>Gas &amp; Fuel</span>
+                    </button>
+                    <button type="button" class="cat-pill" data-category="STEAM" onclick="setCategoryFilter('STEAM')">
+                        <i data-lucide="wind" style="width:13px;height:13px; color:#7C3AED;"></i>
+                        <span>Steam</span>
+                    </button>
                 </div>
                 <div class="reg-filter-count" id="regFilterCount"></div>
             </div>
@@ -3740,15 +3828,39 @@
         </div>
     </div>
 
-    <!-- Application Footer -->
+    <!-- Enterprise Application Footer -->
     <footer class="app-footer">
         <div class="footer-wrap">
-            <div>
-                <strong>EPIC UTILITY HUB</strong> &bull; Central Engineering &bull; Internal Enterprise Management
-                System
+            <div class="footer-meta">
+                <div class="footer-brand-title">
+                    <span style="font-weight:800; color:var(--epic-navy); letter-spacing:-0.01em;">EPIC UTILITY HUB</span>
+                    <span class="footer-divider-dot">&bull;</span>
+                    <span>Central Engineering</span>
+                    <span class="footer-divider-dot">&bull;</span>
+                    <span class="footer-iso-badge">
+                        <i data-lucide="shield-check" style="width:12px;height:12px;"></i>
+                        <span>ISO 50001 Calibrated Energy Monitoring</span>
+                    </span>
+                </div>
+                <div class="footer-credits">
+                    Developed by : <strong style="color:var(--text-main);">Raisul Islam Ratul</strong> | MTO | Central Engineering
+                </div>
             </div>
-            <div>
-                Developed by : Raisul Islam Ratul | MTO | Central Engineering
+
+            <!-- Footer Action Controls: Audit CSV & System Cache Diagnostics -->
+            <div class="footer-actions">
+                <a href="/api/export-csv" class="footer-action-btn export-audit-btn" title="Download consolidated ISO 50001 utility audit CSV across all 6 plants" download>
+                    <i data-lucide="download" style="width:13px; height:13px; color:var(--epic-blue);"></i>
+                    <span>Audit CSV (ISO 50001)</span>
+                </a>
+                <button type="button" class="footer-action-btn system-status-pill" onclick="openSystemHealthModal()" title="View Redis/Cache & Google Sheets API Diagnostics">
+                    <span class="pulse-dot-green"></span>
+                    <span id="cacheStatusLabel">High-Speed In-Memory Cache</span>
+                </button>
+                <div class="footer-live-badge">
+                    <span class="status-dot"></span>
+                    <span>Live Grid Connected</span>
+                </div>
             </div>
         </div>
     </footer>
@@ -5374,12 +5486,6 @@
                             <i data-lucide="check-check" style="width:20px; height:20px; color:#166534; flex-shrink:0;"></i>
                             <span><strong>All ${totalCount} registers recorded for ${selectedDate}.</strong> Single-entry policy restricts duplicate submissions for the same day.</span>
                         </div>
-                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            <span style="font-size:12px; color:#166534; font-weight:600;">Entered wrong data?</span>
-                            <button type="button" class="btn-note-admin" onclick="openAdjustmentModalGeneral()" style="background:#FFFFFF; border:1px solid #BBF7D0; color:#166534; font-weight:700; cursor:pointer;">
-                                <i data-lucide="file-edit" style="width:12px;height:12px; color:#D97706;"></i> Request Adjustment
-                            </button>
-                        </div>
                     `;
                     if (submitBtn) {
                         submitBtn.disabled = true;
@@ -5453,11 +5559,8 @@
                                 data-cost="${row.cost}"
                                 data-prev="${prev !== '-' ? prev : 0}"
                                 data-locked="true">
-                            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px; margin-top:3px;">
+                            <div style="display:flex; justify-content:flex-end; margin-top:3px;">
                                 <span class="locked-tag"><i data-lucide="check-circle" style="width:10px;height:10px;"></i> Recorded for Date</span>
-                                <button type="button" class="btn-note-admin" onclick="openAdminCommentModal('${key}', '${row.section} • ${row.utility} (${row.source})', '${presVal !== '-' ? presVal : ''}')" title="Request correction / adjustment for this register">
-                                    <i data-lucide="file-edit" style="width:11px;height:11px; color:#D97706;"></i> Request Edit
-                                </button>
                             </div>
                         ` : `
                             <input type="number" step="any"
@@ -5654,9 +5757,6 @@
                                     <i data-lucide="check-circle-2" style="width:12px;height:12px;"></i>
                                     Recorded for ${selectedDate}
                                 </span>
-                                <button type="button" class="btn-note-admin" onclick="openAdminCommentModal('${key}', '${row.section} • ${row.utility} (${row.source})', '${presVal !== '-' ? presVal : ''}')" title="Request correction / adjustment for this register">
-                                    <i data-lucide="file-edit" style="width:11px;height:11px; color:#D97706;"></i> Request Edit
-                                </button>
                             </div>
                         ` : ''}
                     `;
