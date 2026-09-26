@@ -42,6 +42,9 @@
    - Desktop features a multi-column data table; mobile view transforms dynamically into touch-optimized register cards with floating sticky action bars.
 6. **Activity & Audit Logging:**
    - Submissions and actions are tracked in the `Logs` sheet with timestamp, plant, IP, and duration metrics.
+7. **Enhanced Corporate UI/UX:**
+   - Updated design system with official EPIC corporate colors (EPIC Blue, Deep Navy).
+   - Modern typography (`Inter` font) for improved readability of data tables and dashboards.
 
 ---
 
