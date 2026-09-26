@@ -3266,6 +3266,473 @@
         }
 
         /* ==========================================================================
+           NAVBAR VIEW TABS (administrator only)
+           ========================================================================== */
+        .nav-tabs {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: auto;
+            margin-right: 16px;
+        }
+
+        .nav-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            height: 32px;
+            padding: 0 13px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: none;
+            border: 1px solid transparent;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+
+        .nav-tab i,
+        .nav-tab svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .nav-tab:hover {
+            background: var(--surface-hover);
+            color: var(--text-main);
+        }
+
+        .nav-tab.active {
+            background: var(--epic-blue-light);
+            color: var(--epic-blue);
+            border-color: rgba(0, 48, 135, 0.18);
+        }
+
+        .nav-tab:focus-visible {
+            outline: 2px solid var(--epic-blue);
+            outline-offset: 2px;
+        }
+
+        /* ==========================================================================
+           ALL RECORDS VIEW (administrator only)
+           ========================================================================== */
+        .records-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .records-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--epic-navy);
+            letter-spacing: -0.02em;
+            margin-bottom: 3px;
+        }
+
+        .records-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .records-head-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .plant-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 14px 15px;
+            border-left: 3px solid var(--card-accent, var(--epic-blue));
+            box-shadow: var(--shadow-sm);
+        }
+
+        .summary-card.is-empty {
+            opacity: 0.62;
+            border-left-color: var(--border-subtle);
+        }
+
+        .summary-card-top {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .summary-plant {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--epic-navy);
+        }
+
+        .summary-count {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .summary-units {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 9px;
+            min-height: 18px;
+        }
+
+        .summary-unit {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .summary-cost {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--epic-blue);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .summary-cost span {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-left: 4px;
+        }
+
+        .summary-last {
+            margin-top: 7px;
+            padding-top: 7px;
+            border-top: 1px dashed var(--border);
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .summary-ot-flag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            color: #B45309;
+        }
+
+        .records-subtabs {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 14px;
+            overflow-x: auto;
+        }
+
+        .records-subtab {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 14px;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .records-subtab i,
+        .records-subtab svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .records-subtab:hover {
+            color: var(--text-main);
+        }
+
+        .records-subtab.active {
+            color: var(--epic-blue);
+            border-bottom-color: var(--epic-blue);
+        }
+
+        .records-subtab:focus-visible {
+            outline: 2px solid var(--epic-blue);
+            outline-offset: -2px;
+        }
+
+        .subtab-count {
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 20px;
+            background: var(--surface-hover);
+            color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .records-subtab.active .subtab-count {
+            background: var(--epic-blue-light);
+            color: var(--epic-blue);
+        }
+
+        .records-filterbar {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .records-search {
+            position: relative;
+            flex: 1 1 260px;
+            min-width: 200px;
+            display: flex;
+            align-items: center;
+        }
+
+        .records-search i,
+        .records-search svg {
+            position: absolute;
+            left: 11px;
+            width: 15px;
+            height: 15px;
+            color: var(--text-light);
+            pointer-events: none;
+        }
+
+        .records-search input {
+            width: 100%;
+            height: 34px;
+            padding: 0 12px 0 33px;
+            font-family: inherit;
+            font-size: 13px;
+            color: var(--text-main);
+            background: var(--surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .records-search input:focus {
+            border-color: var(--epic-blue);
+            box-shadow: 0 0 0 3px rgba(0, 48, 135, 0.1);
+        }
+
+        .records-select,
+        .records-daterange input {
+            height: 34px;
+            padding: 0 10px;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: var(--surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            outline: none;
+            cursor: pointer;
+        }
+
+        .records-select:focus,
+        .records-daterange input:focus {
+            border-color: var(--epic-blue);
+        }
+
+        .records-daterange {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+        }
+
+        .records-table-wrap {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: auto;
+            max-height: 62vh;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .records-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+        }
+
+        .records-table th {
+            padding: 10px 13px;
+            background: var(--surface-muted);
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+            text-align: left;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            white-space: nowrap;
+        }
+
+        .records-table td {
+            padding: 9px 13px;
+            border-bottom: 1px solid var(--border);
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .records-table tbody tr:hover td {
+            background: var(--surface-muted);
+        }
+
+        .records-table td.num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        .records-table td.wrap {
+            white-space: normal;
+            min-width: 200px;
+            max-width: 340px;
+        }
+
+        .records-table tfoot td {
+            position: sticky;
+            bottom: 0;
+            background: var(--epic-blue-subtle);
+            font-weight: 800;
+            color: var(--epic-navy);
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .records-empty {
+            padding: 38px 20px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .records-empty i,
+        .records-empty svg {
+            width: 26px;
+            height: 26px;
+            color: var(--text-light);
+            margin-bottom: 8px;
+        }
+
+        .shift-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 1px 7px;
+            border-radius: 20px;
+            font-size: 10.5px;
+            font-weight: 700;
+        }
+
+        .shift-tag.regular {
+            background: var(--epic-blue-light);
+            color: var(--epic-blue);
+        }
+
+        .shift-tag.overtime {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .status-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 10.5px;
+            font-weight: 700;
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .status-tag.resolved {
+            background: var(--success-bg);
+            color: #166534;
+        }
+
+        .records-note {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-top: 11px;
+            font-size: 11.5px;
+            color: var(--text-muted);
+        }
+
+        .records-note i,
+        .records-note svg {
+            width: 14px;
+            height: 14px;
+            color: var(--text-light);
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 768px) {
+            .nav-tabs {
+                margin-right: 8px;
+                gap: 2px;
+            }
+
+            .nav-tab span {
+                display: none;
+            }
+
+            .nav-tab {
+                padding: 0 10px;
+            }
+
+            .records-table-wrap {
+                max-height: none;
+            }
+
+            .records-filterbar > * {
+                flex: 1 1 100%;
+            }
+        }
+
+        /* ==========================================================================
            SIGN-IN GATE
            Covers the whole app until /api/session confirms an active session.
            ========================================================================== */
@@ -3712,6 +4179,21 @@
             </div>
         </div>
 
+        <!-- Primary view tabs. Rendered only for an administrator session --
+             a plant operator has nothing to switch between. -->
+        <nav class="nav-tabs" id="navTabs" role="tablist" aria-label="Main views" style="display:none;">
+            <button type="button" class="nav-tab active" id="navTabRegisters" role="tab"
+                aria-selected="true" aria-controls="dashboardView" onclick="switchView('registers')">
+                <i data-lucide="clipboard-list"></i>
+                <span>Registers</span>
+            </button>
+            <button type="button" class="nav-tab" id="navTabRecords" role="tab"
+                aria-selected="false" aria-controls="recordsView" onclick="switchView('records')">
+                <i data-lucide="database"></i>
+                <span>All Records</span>
+            </button>
+        </nav>
+
         <!-- Navigation Right Status Bar -->
         <div class="nav-context-status">
             <span class="status-dot"></span>
@@ -4117,6 +4599,167 @@
             </div>
 
             <div id="statusMessage" class="status-message"></div>
+        </section>
+
+        <!-- ==================================================================
+             ALL RECORDS (administrator only)
+             Read-only consolidated view of the workbook: consumption rows from
+             every plant plus Overtime, the adjustment queue, and recent
+             activity. Populated from GET /api/records, which is admin-gated
+             server-side -- this markup is never the access control.
+             ================================================================== -->
+        <section id="recordsView" style="display:none;">
+
+            <div class="records-head">
+                <div>
+                    <h1 class="records-title">Consumption Records</h1>
+                    <p class="records-sub" id="recordsMeta">Loading the full register history&hellip;</p>
+                </div>
+                <div class="records-head-actions">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="loadRecords(true)"
+                        title="Re-read every sheet, bypassing the cache">
+                        <i data-lucide="refresh-cw" id="recordsRefreshIcon"></i>
+                        <span>Refresh</span>
+                    </button>
+                    <a href="/api/export-csv" class="btn btn-secondary btn-sm" download
+                        title="Download consolidated consumption audit across all plants">
+                        <i data-lucide="download"></i>
+                        <span>Export CSV</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Per-plant rollup cards -->
+            <div class="plant-summary-grid" id="plantSummaryGrid"></div>
+
+            <!-- Data set sub-tabs -->
+            <div class="records-subtabs" role="tablist" aria-label="Record types">
+                <button type="button" class="records-subtab active" id="subTabRecords" role="tab"
+                    aria-selected="true" onclick="switchRecordsTab('records')">
+                    <i data-lucide="table-2"></i><span>Entries</span>
+                    <span class="subtab-count" id="countRecords">0</span>
+                </button>
+                <button type="button" class="records-subtab" id="subTabAdjustments" role="tab"
+                    aria-selected="false" onclick="switchRecordsTab('adjustments')">
+                    <i data-lucide="file-edit"></i><span>Adjustment Requests</span>
+                    <span class="subtab-count" id="countAdjustments">0</span>
+                </button>
+                <button type="button" class="records-subtab" id="subTabLogs" role="tab"
+                    aria-selected="false" onclick="switchRecordsTab('logs')">
+                    <i data-lucide="scroll-text"></i><span>Activity Log</span>
+                    <span class="subtab-count" id="countLogs">0</span>
+                </button>
+            </div>
+
+            <!-- ENTRIES -->
+            <div class="records-panel" id="panelRecords">
+                <div class="records-filterbar">
+                    <div class="records-search">
+                        <i data-lucide="search"></i>
+                        <input type="search" id="recordsSearch" placeholder="Search section, utility, source, equipment&hellip;"
+                            oninput="renderRecordsTable()" aria-label="Search entries">
+                    </div>
+                    <select id="recordsPlantFilter" class="records-select" onchange="renderRecordsTable()"
+                        aria-label="Filter by facility">
+                        <option value="ALL">All facilities</option>
+                    </select>
+                    <select id="recordsShiftFilter" class="records-select" onchange="renderRecordsTable()"
+                        aria-label="Filter by shift">
+                        <option value="ALL">All shifts</option>
+                        <option value="Regular">Regular</option>
+                        <option value="Overtime">Overtime</option>
+                    </select>
+                    <label class="records-daterange">
+                        <span>From</span>
+                        <input type="date" id="recordsDateFrom" onchange="renderRecordsTable()" aria-label="From date">
+                    </label>
+                    <label class="records-daterange">
+                        <span>To</span>
+                        <input type="date" id="recordsDateTo" onchange="renderRecordsTable()" aria-label="To date">
+                    </label>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="resetRecordsFilters()">
+                        <i data-lucide="rotate-ccw"></i><span>Reset</span>
+                    </button>
+                </div>
+
+                <div class="records-table-wrap">
+                    <table class="records-table" id="recordsTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Facility</th>
+                                <th>Shift</th>
+                                <th>Section</th>
+                                <th>Utility</th>
+                                <th>Source</th>
+                                <th>Equipment</th>
+                                <th>Unit</th>
+                                <th class="text-right">Previous</th>
+                                <th class="text-right">Present</th>
+                                <th class="text-right">Consumption</th>
+                                <th class="text-right">Unit Cost</th>
+                                <th class="text-right">Total (BDT)</th>
+                                <th class="text-right">Total (USD)</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recordsTableBody"></tbody>
+                        <tfoot id="recordsTableFoot"></tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ADJUSTMENT REQUESTS -->
+            <div class="records-panel" id="panelAdjustments" style="display:none;">
+                <div class="records-table-wrap">
+                    <table class="records-table">
+                        <thead>
+                            <tr>
+                                <th>Request ID</th>
+                                <th>Submitted</th>
+                                <th>Facility</th>
+                                <th>Shift</th>
+                                <th>Target Date</th>
+                                <th>Register</th>
+                                <th class="text-right">Wrong</th>
+                                <th class="text-right">Correct</th>
+                                <th>Reason</th>
+                                <th>Requested By</th>
+                                <th>Contact</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adjustmentsTableBody"></tbody>
+                    </table>
+                </div>
+                <p class="records-note">
+                    <i data-lucide="info"></i>
+                    Requests are actioned in the <strong>Adjustment/Correction Record</strong> sheet. This view is read-only.
+                </p>
+            </div>
+
+            <!-- ACTIVITY LOG -->
+            <div class="records-panel" id="panelLogs" style="display:none;">
+                <div class="records-table-wrap">
+                    <table class="records-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time (BST)</th>
+                                <th>Facility</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th class="text-right">Records</th>
+                                <th>IP Address</th>
+                                <th>Device</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody"></tbody>
+                    </table>
+                </div>
+                <p class="records-note" id="logsNote"></p>
+            </div>
+
         </section>
     </main>
 
@@ -4752,6 +5395,10 @@
             show('footerExportCsv', isAdmin);
             show('footerDiagnostics', isAdmin);
             show('footerSignOut', true);
+            // The All Records tab is meaningless to a plant operator -- their
+            // session can only ever see their own facility.
+            const tabs = document.getElementById('navTabs');
+            if (tabs) tabs.style.display = isAdmin ? 'flex' : 'none';
 
             const label = document.getElementById('footerSessionLabel');
             if (label) {
@@ -4781,7 +5428,12 @@
 
             // Initial routing from URL hash (e.g. #EGMCL%207 or #EGMCL%201?ot=1)
             const initialHash = window.location.hash.replace('#', '').trim();
-            if (initialHash) {
+            if (initialHash === 'records' && sessionRole === 'admin') {
+                // Checked before the plant lookup: "records" is not a facility,
+                // and canOpenPlant() would reject it with an access error.
+                switchView('records', false);
+                history.replaceState({ view: 'records' }, '', '#records');
+            } else if (initialHash) {
                 const parts = initialHash.split('?');
                 const plantName = decodeURIComponent(parts[0]);
                 const isOT = parts[1] && parts[1].includes('ot=1');
@@ -4798,12 +5450,20 @@
             // Browser Back / Forward native navigation handler
             window.addEventListener('popstate', (e) => {
                 const state = e.state;
-                if (state && state.view === 'facility' && state.plant) {
+                if (state && state.view === 'records') {
+                    switchView('records', false);
+                } else if (state && state.view === 'facility' && state.plant) {
+                    switchView('registers', false);
                     openPlant(state.plant, !!state.isOT, false);
                 } else if (state && state.view === 'home') {
+                    switchView('registers', false);
                     goHome(false);
                 } else {
                     const rawHash = window.location.hash.replace('#', '').trim();
+                    if (rawHash === 'records' && sessionRole === 'admin') {
+                        switchView('records', false);
+                        return;
+                    }
                     if (rawHash) {
                         const parts = rawHash.split('?');
                         const plantName = decodeURIComponent(parts[0]);
@@ -4830,6 +5490,355 @@
             if (mainApp) mainApp.style.display = 'block';
             initIcons();
         }
+
+        /* ==========================================================================
+           ALL RECORDS VIEW (administrator only)
+
+           Read-only. Everything rendered here originates in the spreadsheet, so
+           every interpolated value goes through escapeHtml() -- an operator can
+           type anything into a remark or an adjustment reason.
+           ========================================================================== */
+
+        let recordsData = null;      // last /api/records payload
+        let recordsLoading = false;
+        let activeRecordsTab = 'records';
+
+        /** Top-level view switch: the facility register vs the records browser. */
+        function switchView(view, pushHistory = true) {
+            // Defence in depth only -- /api/records is admin-gated server-side.
+            if (view === 'records' && sessionRole !== 'admin') return;
+
+            const dash = document.getElementById('dashboardView');
+            const entry = document.getElementById('entryView');
+            const recs = document.getElementById('recordsView');
+            const tabReg = document.getElementById('navTabRegisters');
+            const tabRec = document.getElementById('navTabRecords');
+
+            if (view === 'records') {
+                if (dash) dash.style.display = 'none';
+                if (entry) entry.style.display = 'none';
+                if (recs) recs.style.display = 'block';
+                if (tabReg) { tabReg.classList.remove('active'); tabReg.setAttribute('aria-selected', 'false'); }
+                if (tabRec) { tabRec.classList.add('active'); tabRec.setAttribute('aria-selected', 'true'); }
+
+                if (pushHistory && window.location.hash !== '#records') {
+                    history.pushState({ view: 'records' }, '', '#records');
+                }
+                if (!recordsData) loadRecords();
+            } else {
+                if (recs) recs.style.display = 'none';
+                if (tabRec) { tabRec.classList.remove('active'); tabRec.setAttribute('aria-selected', 'false'); }
+                if (tabReg) { tabReg.classList.add('active'); tabReg.setAttribute('aria-selected', 'true'); }
+
+                if (activePlant) {
+                    if (entry) entry.style.display = 'block';
+                } else {
+                    if (dash) dash.style.display = 'block';
+                }
+                if (pushHistory && window.location.hash === '#records') {
+                    history.pushState({ view: 'home' }, '', window.location.pathname + window.location.search);
+                }
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            initIcons();
+        }
+
+        async function loadRecords(force = false) {
+            if (recordsLoading) return;
+            recordsLoading = true;
+
+            const icon = document.getElementById('recordsRefreshIcon');
+            const meta = document.getElementById('recordsMeta');
+            if (icon) icon.classList.add('spinner');
+            if (meta) meta.textContent = 'Reading every facility sheet…';
+
+            try {
+                if (force) {
+                    // Clearing the cache makes Refresh mean "re-read the sheets",
+                    // not "show me the same 2-minute-old snapshot".
+                    await fetch('/api/cache/clear', { method: 'POST', credentials: 'same-origin' });
+                }
+                const res = await fetch('/api/records', { credentials: 'same-origin' });
+                if (res.status === 401) { handleAuthExpiry(); return; }
+                if (res.status === 403) {
+                    if (meta) meta.textContent = 'This view requires an administrator session.';
+                    return;
+                }
+                if (!res.ok) throw new Error(`Request failed (${res.status}).`);
+
+                recordsData = await res.json();
+                renderRecords();
+            } catch (err) {
+                if (meta) meta.textContent = 'Could not load records: ' + (err.message || err);
+            } finally {
+                recordsLoading = false;
+                if (icon) icon.classList.remove('spinner');
+            }
+        }
+
+        function renderRecords() {
+            if (!recordsData) return;
+            const d = recordsData;
+
+            const meta = document.getElementById('recordsMeta');
+            if (meta) {
+                meta.textContent =
+                    `${d.records.length} entries across ${d.plants.length} facilities · ` +
+                    `${d.adjustments.length} adjustment request(s) · ` +
+                    `read ${d.generatedAt} (BST)`;
+            }
+
+            setText('countRecords', d.records.length);
+            setText('countAdjustments', d.adjustments.length);
+            setText('countLogs', d.logs.length);
+
+            // Facility filter options, built once from the payload.
+            const sel = document.getElementById('recordsPlantFilter');
+            if (sel && sel.options.length <= 1) {
+                d.plants.forEach(p => {
+                    const o = document.createElement('option');
+                    o.value = p.plant;
+                    o.textContent = `${p.plant} (${p.records})`;
+                    sel.appendChild(o);
+                });
+            }
+
+            renderPlantSummary(d.plants);
+            renderRecordsTable();
+            renderAdjustmentsTable();
+            renderLogsTable();
+            initIcons();
+        }
+
+        function setText(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        }
+
+        function renderPlantSummary(plants) {
+            const grid = document.getElementById('plantSummaryGrid');
+            if (!grid) return;
+
+            grid.innerHTML = plants.map(p => {
+                const desc = plantDescriptions[p.plant] || {};
+                const accent = desc.accentColor || '#003087';
+                const units = Object.keys(p.units).length
+                    ? Object.keys(p.units).map(u =>
+                        `<span class="summary-unit">${fmtNum(p.units[u])} ${escapeHtml(u)}</span>`).join('')
+                    : '<span class="summary-unit" style="color:var(--text-light);">No consumption recorded</span>';
+
+                return `
+                    <div class="summary-card ${p.records === 0 ? 'is-empty' : ''}" style="--card-accent:${accent};">
+                        <div class="summary-card-top">
+                            <span class="summary-plant">${escapeHtml(p.plant)}</span>
+                            <span class="summary-count">${p.records} ${p.records === 1 ? 'entry' : 'entries'}</span>
+                        </div>
+                        <div class="summary-units">${units}</div>
+                        <div class="summary-cost">
+                            &#2547; ${fmtMoney(p.totalBdt)}<span>($${fmtMoney(p.totalUsd)})</span>
+                        </div>
+                        <div class="summary-last">
+                            <i data-lucide="calendar-check" style="width:12px;height:12px;"></i>
+                            <span>${p.lastDate ? 'Last entry ' + escapeHtml(p.lastDate) : 'No entries yet'}</span>
+                            ${p.overtimeRecords > 0
+                                ? `<span class="summary-ot-flag"><i data-lucide="clock" style="width:10px;height:10px;"></i>${p.overtimeRecords} OT</span>`
+                                : ''}
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function fmtNum(v) {
+            return (Number(v) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+        }
+
+        function fmtMoney(v) {
+            return (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        /** Apply search, facility, shift and date-range filters to the entries table. */
+        function getFilteredRecords() {
+            if (!recordsData) return [];
+            const q = (document.getElementById('recordsSearch')?.value || '').trim().toLowerCase();
+            const plant = document.getElementById('recordsPlantFilter')?.value || 'ALL';
+            const shift = document.getElementById('recordsShiftFilter')?.value || 'ALL';
+            const from = document.getElementById('recordsDateFrom')?.value || '';
+            const to = document.getElementById('recordsDateTo')?.value || '';
+
+            return recordsData.records.filter(r => {
+                if (plant !== 'ALL' && r.plant !== plant) return false;
+                if (shift !== 'ALL' && r.shift !== shift) return false;
+                if (from && r.date < from) return false;
+                if (to && r.date > to) return false;
+                if (q) {
+                    const hay = `${r.section} ${r.utility} ${r.source} ${r.equip} ${r.unit} ${r.remarks}`.toLowerCase();
+                    if (hay.indexOf(q) === -1) return false;
+                }
+                return true;
+            });
+        }
+
+        function renderRecordsTable() {
+            const body = document.getElementById('recordsTableBody');
+            const foot = document.getElementById('recordsTableFoot');
+            if (!body) return;
+
+            const rows = getFilteredRecords();
+
+            if (rows.length === 0) {
+                body.innerHTML = `
+                    <tr><td colspan="15">
+                        <div class="records-empty">
+                            <i data-lucide="inbox"></i>
+                            <div>${recordsData && recordsData.records.length
+                                ? 'No entries match these filters.'
+                                : 'No consumption has been recorded yet.'}</div>
+                        </div>
+                    </td></tr>`;
+                if (foot) foot.innerHTML = '';
+                initIcons();
+                return;
+            }
+
+            body.innerHTML = rows.map(r => `
+                <tr>
+                    <td>${escapeHtml(r.date)}</td>
+                    <td><strong>${escapeHtml(r.plant)}</strong></td>
+                    <td><span class="shift-tag ${r.shift === 'Overtime' ? 'overtime' : 'regular'}">${escapeHtml(r.shift)}</span></td>
+                    <td>${escapeHtml(r.section)}</td>
+                    <td>${escapeHtml(r.utility)}</td>
+                    <td>${escapeHtml(r.source)}</td>
+                    <td>${escapeHtml(r.equip)}</td>
+                    <td>${escapeHtml(r.unit)}</td>
+                    <td class="num">${fmtNum(r.prev)}</td>
+                    <td class="num">${fmtNum(r.pres)}</td>
+                    <td class="num"><strong>${fmtNum(r.diff)}</strong></td>
+                    <td class="num">${fmtNum(r.unitCost)}</td>
+                    <td class="num">${fmtMoney(r.totalBdt)}</td>
+                    <td class="num">${fmtMoney(r.totalUsd)}</td>
+                    <td class="wrap">${escapeHtml(r.remarks) || '<span style="color:var(--text-light);">&mdash;</span>'}</td>
+                </tr>`).join('');
+
+            const totalBdt = rows.reduce((s, r) => s + (Number(r.totalBdt) || 0), 0);
+            const totalUsd = rows.reduce((s, r) => s + (Number(r.totalUsd) || 0), 0);
+            if (foot) {
+                foot.innerHTML = `
+                    <tr>
+                        <td colspan="10">${rows.length} of ${recordsData.records.length} entries</td>
+                        <td class="num">&mdash;</td>
+                        <td class="num">&mdash;</td>
+                        <td class="num">&#2547; ${fmtMoney(totalBdt)}</td>
+                        <td class="num">$ ${fmtMoney(totalUsd)}</td>
+                        <td></td>
+                    </tr>`;
+            }
+            initIcons();
+        }
+
+        function renderAdjustmentsTable() {
+            const body = document.getElementById('adjustmentsTableBody');
+            if (!body || !recordsData) return;
+            const rows = recordsData.adjustments;
+
+            if (rows.length === 0) {
+                body.innerHTML = `
+                    <tr><td colspan="12">
+                        <div class="records-empty">
+                            <i data-lucide="check-circle-2"></i>
+                            <div>No correction requests have been submitted.</div>
+                        </div>
+                    </td></tr>`;
+                initIcons();
+                return;
+            }
+
+            body.innerHTML = rows.map(a => {
+                const resolved = !/pending/i.test(a.status || '');
+                return `
+                    <tr>
+                        <td><strong>${escapeHtml(a.requestId)}</strong></td>
+                        <td>${escapeHtml(a.timestamp)}</td>
+                        <td>${escapeHtml(a.plant)}</td>
+                        <td>${escapeHtml(a.shiftType)}</td>
+                        <td>${escapeHtml(a.targetDate)}</td>
+                        <td class="wrap">${escapeHtml(a.register)}</td>
+                        <td class="num">${escapeHtml(a.wrongValue) || '&mdash;'}</td>
+                        <td class="num">${escapeHtml(a.correctValue) || '&mdash;'}</td>
+                        <td class="wrap">${escapeHtml(a.reason)}</td>
+                        <td>${escapeHtml(a.staffName)}</td>
+                        <td>${escapeHtml(a.phone)}</td>
+                        <td><span class="status-tag ${resolved ? 'resolved' : ''}">${escapeHtml(a.status)}</span></td>
+                    </tr>`;
+            }).join('');
+            initIcons();
+        }
+
+        function renderLogsTable() {
+            const body = document.getElementById('logsTableBody');
+            const note = document.getElementById('logsNote');
+            if (!body || !recordsData) return;
+            const rows = recordsData.logs;
+
+            if (rows.length === 0) {
+                body.innerHTML = `
+                    <tr><td colspan="8">
+                        <div class="records-empty">
+                            <i data-lucide="scroll-text"></i>
+                            <div>No activity recorded yet.</div>
+                        </div>
+                    </td></tr>`;
+            } else {
+                body.innerHTML = rows.map(l => `
+                    <tr>
+                        <td>${escapeHtml(l.date)}</td>
+                        <td>${escapeHtml(l.time)}</td>
+                        <td>${escapeHtml(l.plant)}</td>
+                        <td>${escapeHtml(l.action)}</td>
+                        <td class="wrap">${escapeHtml(l.details)}</td>
+                        <td class="num">${escapeHtml(l.records) || '&mdash;'}</td>
+                        <td>${escapeHtml(l.ip)}</td>
+                        <td>${escapeHtml([l.device, l.browser, l.os].filter(Boolean).join(' · '))}</td>
+                    </tr>`).join('');
+            }
+
+            if (note) {
+                note.innerHTML = rows.length >= recordsData.logsTruncatedAt
+                    ? `<i data-lucide="info"></i> Showing the ${recordsData.logsTruncatedAt} most recent entries. The full history lives in the <strong>Logs</strong> sheet.`
+                    : `<i data-lucide="info"></i> Showing all ${rows.length} logged events, most recent first.`;
+            }
+            initIcons();
+        }
+
+        function switchRecordsTab(tab) {
+            activeRecordsTab = tab;
+            const map = {
+                records: ['subTabRecords', 'panelRecords'],
+                adjustments: ['subTabAdjustments', 'panelAdjustments'],
+                logs: ['subTabLogs', 'panelLogs']
+            };
+            Object.keys(map).forEach(key => {
+                const [btnId, panelId] = map[key];
+                const btn = document.getElementById(btnId);
+                const panel = document.getElementById(panelId);
+                const on = key === tab;
+                if (btn) { btn.classList.toggle('active', on); btn.setAttribute('aria-selected', String(on)); }
+                if (panel) panel.style.display = on ? 'block' : 'none';
+            });
+            initIcons();
+        }
+
+        function resetRecordsFilters() {
+            ['recordsSearch', 'recordsDateFrom', 'recordsDateTo'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            const p = document.getElementById('recordsPlantFilter');
+            if (p) p.value = 'ALL';
+            const s = document.getElementById('recordsShiftFilter');
+            if (s) s.value = 'ALL';
+            renderRecordsTable();
+        }
+
         /* ==========================================================================
            DATA ENTRY WORKFLOW
            ========================================================================== */
@@ -4913,6 +5922,16 @@
             initIcons();
         }
 
+        /** Leave the records browser without touching history or plant state. */
+        function exitRecordsView() {
+            const recs = document.getElementById('recordsView');
+            if (recs) recs.style.display = 'none';
+            const tabReg = document.getElementById('navTabRegisters');
+            const tabRec = document.getElementById('navTabRecords');
+            if (tabReg) { tabReg.classList.add('active'); tabReg.setAttribute('aria-selected', 'true'); }
+            if (tabRec) { tabRec.classList.remove('active'); tabRec.setAttribute('aria-selected', 'false'); }
+        }
+
         function openPlant(plant, isOT = false, pushHistory = true) {
             // A hand-typed hash must not reach another facility's register.
             // The server rejects it too; this keeps the UI honest about it.
@@ -4922,6 +5941,7 @@
                 return;
             }
 
+            exitRecordsView();
             activePlant = plant;
             plantOpenedTimestamp = Date.now();
 
@@ -5011,6 +6031,7 @@
         }
 
         function goHome(pushHistory = true) {
+            exitRecordsView();
             document.body.classList.remove('overtime-theme');
 
             // Log duration before closing

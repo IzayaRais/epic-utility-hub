@@ -728,6 +728,204 @@ app.post('/api/log-activity',
   }
 );
 
+// ============================================================================
+// ADMINISTRATOR RECORDS VIEW
+// ============================================================================
+// Consolidated read-only view of everything in the workbook: consumption rows
+// from all six plant sheets plus Overtime, the adjustment-request queue, and
+// the recent activity log. Administrator only -- this is the whole database in
+// one response, so it must never be reachable with a plant session.
+
+const LOG_ROWS_RETURNED = 300;
+
+/** Rows of a plant sheet -> normalised record objects. */
+function mapPlantRows(data, plant) {
+  const out = [];
+  for (let i = 1; i < data.length; i++) {
+    const r = data[i];
+    if (r[0] === undefined || r[0] === null || String(r[0]).trim() === '') continue;
+    out.push({
+      date: formatDateIso(r[0]),
+      plant,
+      shift: 'Regular',
+      section: r[3] || '', utility: r[4] || '', source: r[5] || '',
+      equip: r[6] || '', unit: r[7] || '',
+      prev: Number(r[8]) || 0,
+      pres: Number(r[9]) || 0,
+      diff: Number(r[10]) || 0,
+      unitCost: Number(r[16]) || 0,
+      totalBdt: Number(r[17]) || 0,
+      totalUsd: Number(r[18]) || 0,
+      remarks: r[19] || ''
+    });
+  }
+  return out;
+}
+
+/** The Overtime sheet holds every plant, with Plant in column D (+1 offset). */
+function mapOvertimeRows(data) {
+  const out = [];
+  for (let i = 1; i < data.length; i++) {
+    const r = data[i];
+    if (r[0] === undefined || r[0] === null || String(r[0]).trim() === '') continue;
+    out.push({
+      date: formatDateIso(r[0]),
+      plant: r[3] || '',
+      shift: 'Overtime',
+      section: r[4] || '', utility: r[5] || '', source: r[6] || '',
+      equip: r[7] || '', unit: r[8] || '',
+      prev: Number(r[9]) || 0,
+      pres: Number(r[10]) || 0,
+      diff: Number(r[11]) || 0,
+      unitCost: Number(r[17]) || 0,
+      totalBdt: Number(r[18]) || 0,
+      totalUsd: Number(r[19]) || 0,
+      remarks: r[20] || ''
+    });
+  }
+  return out;
+}
+
+/** Per-plant rollup shown as cards above the table. */
+function summarisePlants(records) {
+  const summary = {};
+  registers.PLANTS.forEach(p => {
+    summary[p] = {
+      plant: p, records: 0, overtimeRecords: 0,
+      units: {}, totalBdt: 0, totalUsd: 0, lastDate: ''
+    };
+  });
+
+  records.forEach(rec => {
+    const s = summary[rec.plant];
+    if (!s) return; // a row for a plant no longer in the register list
+    s.records += 1;
+    if (rec.shift === 'Overtime') s.overtimeRecords += 1;
+    if (rec.unit) s.units[rec.unit] = (s.units[rec.unit] || 0) + rec.diff;
+    s.totalBdt += rec.totalBdt;
+    s.totalUsd += rec.totalUsd;
+    if (rec.date > s.lastDate) s.lastDate = rec.date;
+  });
+
+  return registers.PLANTS.map(p => summary[p]);
+}
+
+app.get('/api/records',
+  sec.requireAdmin,
+  rateLimit({
+    max: 60,
+    windowSec: 60 * 60,
+    keyFn: (req) => `records:${sec.getClientIp(req)}`
+  }),
+  async (req, res) => {
+    try {
+      const cacheKey = 'records:all';
+      const cached = await cacheGet(cacheKey);
+      if (cached) {
+        res.set('X-Cache', 'HIT');
+        return res.json(cached);
+      }
+
+      const records = [];
+
+      for (const plant of registers.PLANTS) {
+        try {
+          const r = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${registers.PLANT_SHEET_MAP[plant]}!A:T`,
+            valueRenderOption: 'UNFORMATTED_VALUE'
+          });
+          records.push(...mapPlantRows(r.data.values || [], plant));
+        } catch (e) {
+          console.warn(`Records: could not read ${plant}:`, e.message);
+        }
+      }
+
+      try {
+        const r = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: 'Overtime!A:U',
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        });
+        records.push(...mapOvertimeRows(r.data.values || []));
+      } catch (e) {
+        console.warn('Records: could not read Overtime:', e.message);
+      }
+
+      // Newest first -- an admin opening this wants today's entries on top.
+      records.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+
+      // Adjustments and Logs are read FORMATTED: their date/time columns were
+      // written as text and parsed by Sheets into serials, and the display
+      // string is what an admin actually wants to read.
+      let adjustments = [];
+      try {
+        const r = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CONFIG.ADJUSTMENT_SHEET_NAME}!A:O`,
+          valueRenderOption: 'FORMATTED_VALUE'
+        });
+        const data = r.data.values || [];
+        for (let i = 1; i < data.length; i++) {
+          const a = data[i];
+          if (!a[0]) continue;
+          adjustments.push({
+            requestId: a[0] || '', timestamp: a[1] || '', plant: a[2] || '',
+            shiftType: a[3] || '', targetDate: a[4] || '', register: a[5] || '',
+            wrongValue: a[6] || '', correctValue: a[7] || '', reason: a[8] || '',
+            staffName: a[9] || '', phone: a[10] || '', status: a[11] || 'Pending Review',
+            adminRemarks: a[12] || '', reviewedBy: a[13] || '', reviewDate: a[14] || ''
+          });
+        }
+        adjustments.reverse();
+      } catch (e) {
+        console.warn('Records: could not read adjustments:', e.message);
+      }
+
+      let logs = [];
+      try {
+        const r = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CONFIG.LOGS_SHEET_NAME}!A:N`,
+          valueRenderOption: 'FORMATTED_VALUE'
+        });
+        const data = r.data.values || [];
+        for (let i = 1; i < data.length; i++) {
+          const l = data[i];
+          if (!l[0]) continue;
+          logs.push({
+            date: l[0] || '', time: l[1] || '', plant: l[2] || '',
+            entryDate: l[3] || '', action: l[4] || '', details: l[5] || '',
+            records: l[6] || '', duration: l[7] || '', ip: l[8] || '',
+            device: l[10] || '', browser: l[11] || '', os: l[12] || ''
+          });
+        }
+        // Most recent first, capped: this sheet grows without bound.
+        logs.reverse();
+        logs = logs.slice(0, LOG_ROWS_RETURNED);
+      } catch (e) {
+        console.warn('Records: could not read logs:', e.message);
+      }
+
+      const payload = {
+        generatedAt: getBDTime().fullStr,
+        plants: summarisePlants(records),
+        records,
+        adjustments,
+        logs,
+        logsTruncatedAt: LOG_ROWS_RETURNED,
+        usdRate: CONFIG.USD_CONVERSION_RATE
+      };
+
+      await cacheSet(cacheKey, payload, 120);
+      res.set('X-Cache', 'MISS');
+      res.json(payload);
+    } catch (err) {
+      return sec.failSafely(res, err, 'GET /api/records');
+    }
+  }
+);
+
 // Endpoint: Export Full Consumption Audit CSV (administrator only -- this is
 // every plant's consumption and cost history in one file)
 app.get('/api/export-csv',
