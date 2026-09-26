@@ -27,24 +27,23 @@
 
 ## ✨ Key Features
 
-1. **Smart Meter Data Entry & Single-Entry Daily Lock:**
-   - Enforces a single-entry policy per register per date.
-   - If partial data is entered, unlocked meters can still be logged on the same day without overwriting existing records.
-2. **Dual Currency Conversion (BDT & USD):**
-   - Automatically computes total utility costs in **BDT (৳)** and **USD ($)** at the enterprise standard conversion rate (`1 USD = 123 BDT`).
-3. **Overtime Shift Mode & Theme:**
+3. **Automatic Chronological Previous Reading Inheritance:**
+   - Previous reading is dynamically inherited from the most recent prior recorded date.
+   - When entering readings for a new date, operators only need to input the **Present Reading**.
+   - Consumption difference (`Present - Previous`) and estimated costs (BDT & USD) compute instantly in real-time.
+4. **Single-Entry Policy & Daily Lock:**
+   - Enforces one submission per meter register per date.
+   - If only partial registers are submitted, remaining unlocked meters can still be filled out on that day without overwriting saved registers.
+5. **Overtime Shift Mode & Theme:**
    - Dedicated overtime toggle shifts the UI into a calibrated warm reddish/crimson theme.
-   - Includes an executive shift justification card with one-click quick-chips (`+ Emergency Dyeing`, `+ Finishing Overtime`, `+ Boiler Run`, etc.).
-4. **Adjustment / Correction Request Workflow:**
+   - Includes shift justification tracking with quick-chips (`+ Emergency Dyeing`, `+ Finishing Overtime`, etc.) recorded in dedicated `Overtime` sheets.
+6. **Adjustment / Correction Request Workflow:**
    - Operators can request corrections for erroneous entries by clicking **Request Adjustment**.
    - Submissions are logged into the dedicated `Adjustment/Correction Record` Google Sheet with unique tracking IDs (`REQ-YYYYMMDD-XXXX`).
-5. **Full Mobile Responsiveness:**
-   - Desktop features a multi-column data table; mobile view transforms dynamically into touch-optimized register cards with floating sticky action bars.
-6. **Activity & Audit Logging:**
-   - Submissions and actions are tracked in the `Logs` sheet with timestamp, plant, IP, and duration metrics.
-7. **Enhanced Corporate UI/UX:**
-   - Updated design system with official EPIC corporate colors (EPIC Blue, Deep Navy).
-   - Modern typography (`Inter` font) for improved readability of data tables and dashboards.
+7. **Activity & Audit Logging:**
+   - Submissions, adjustments, and navigation events are logged in the `Logs` sheet with timestamp, plant, IP, and duration metrics.
+8. **Touch-Optimized Mobile View:**
+   - On screens under 768px, transforms into individual register cards with a sticky bottom action bar, 48px touch targets, and safe-area padding.
 
 ---
 
@@ -52,9 +51,11 @@
 
 ```text
 ├── Index.html                  # Responsive Single-Page Application (HTML5 / Vanilla CSS / Modern JS)
-├── code.gs                     # Google Apps Script backend controller & spreadsheet integration
-├── server.js                   # Local Node.js development server with adjustment endpoints
-├── adjustment_records.json     # Local simulation ledger for adjustment & correction requests
+├── server.js                   # Node.js Express backend with Google Sheets API v4 integration
+├── vercel.json                 # Vercel serverless deployment configuration
+├── credentials.json            # Google Cloud Service Account credentials (git-ignored)
+├── package.json                # Project dependencies (express, googleapis, cors, etc.)
+├── code.gs                     # Legacy Google Apps Script backend controller
 ├── Utility Budget Automation.xlsx # Reference engineering utility budget & register master workbook
 ├── .gitignore
 └── README.md
@@ -62,17 +63,18 @@
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Deployment & Running
 
-### Local Development
-To run the application locally without any dependencies:
+### 1. Local Development
 ```bash
+npm install
 node server.js
 ```
 Open [http://localhost:3000](http://localhost:3000) in any modern browser.
 
-### Google Apps Script Deployment
-1. Open Google Sheets and go to **Extensions > Apps Script**.
-2. Copy the contents of `code.gs` into `code.gs`.
-3. Create an HTML file named `Index.html` and paste the contents of `Index.html`.
-4. Deploy as a Web App with access set to your organization or authorized users.
+### 2. Vercel Cloud Deployment
+1. Import the GitHub repository (`IzayaRais/epic-utility-hub`) into **Vercel**.
+2. Under **Project Settings > Environment Variables**, add:
+   - `GOOGLE_CREDENTIALS`: Paste the complete JSON contents of your `credentials.json`.
+   - *(Optional)* `SPREADSHEET_ID`: `1dfY5fkCvrgFTkGxH8ozSUhmct7q5oL6gCSWnpwUV7LY`
+3. Click **Deploy**. Vercel will host the web app and route all API calls through the serverless `server.js` functions.

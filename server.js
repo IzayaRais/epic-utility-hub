@@ -13,22 +13,44 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '.')));
 
-const SPREADSHEET_ID = '1dfY5fkCvrgFTkGxH8ozSUhmct7q5oL6gCSWnpwUV7LY';
+const SPREADSHEET_ID = process.env.SPREADSHEET_ID || '1dfY5fkCvrgFTkGxH8ozSUhmct7q5oL6gCSWnpwUV7LY';
 const CONFIG = {
   USD_CONVERSION_RATE: 123,
   LOGS_SHEET_NAME: 'Logs',
   ADJUSTMENT_SHEET_NAME: 'Adjustment/Correction Record'
 };
 
-// --- Google Sheets Auth ---
+// --- Google Sheets Auth (Supports credentials.json or GOOGLE_CREDENTIALS / individual env vars for Vercel/Cloud) ---
 let sheets;
 try {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: path.join(__dirname, 'credentials.json'),
+  let authConfig = {
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
-  });
+  };
+
+  if (process.env.GOOGLE_CREDENTIALS) {
+    try {
+      const parsedCreds = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+      authConfig.credentials = parsedCreds;
+    } catch (e) {
+      console.warn("GOOGLE_CREDENTIALS env var found but failed to JSON parse, checking file fallback...");
+    }
+  } else if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+    authConfig.credentials = {
+      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n')
+    };
+  }
+
+  if (!authConfig.credentials) {
+    const credPath = path.join(__dirname, 'credentials.json');
+    if (fs.existsSync(credPath)) {
+      authConfig.keyFile = credPath;
+    }
+  }
+
+  const auth = new google.auth.GoogleAuth(authConfig);
   sheets = google.sheets({ version: 'v4', auth });
-  console.log("Google Sheets API client initialized.");
+  console.log("Google Sheets API client initialized successfully.");
 } catch (error) {
   console.error("Error initializing Google Sheets client:", error);
 }
@@ -46,11 +68,28 @@ function getSheetName(plant) {
   return plantMap[plant] || null;
 }
 
+// Robust date normalizer supporting Excel serial numbers, '25-Sep-26', ISO 'YYYY-MM-DD', Date objects
 function formatDateIso(val) {
-  if (!val) return '';
+  if (val === undefined || val === null || val === '') return '';
+  if (typeof val === 'number') {
+    // Excel serial date to ISO
+    const utc_days = Math.floor(val - 25569);
+    const date = new Date(utc_days * 86400 * 1000);
+    return date.toISOString().split('T')[0];
+  }
   const str = String(val).trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
     return str.substring(0, 10);
+  }
+  // Format: 25-Sep-26 or 25-Sep-2026
+  const parts = str.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+  if (parts) {
+    const day = parts[1].padStart(2, '0');
+    const months = { jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12' };
+    const m = months[parts[2].toLowerCase()];
+    let yr = parts[3];
+    if (yr.length === 2) yr = '20' + yr;
+    if (m) return `${yr}-${m}-${day}`;
   }
   const parsed = new Date(str);
   if (!isNaN(parsed.getTime())) {
@@ -64,16 +103,18 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'Index.html'));
 });
 
-// Endpoint: Fetch Previous Readings
+// Endpoint: Fetch Previous Readings & Daily Locked State
 app.post('/api/previous-readings', async (req, res) => {
   try {
     const { plant, isOvertime, targetDate } = req.body;
     const sheetName = isOvertime ? 'Overtime' : getSheetName(plant);
     if (!sheetName) return res.status(400).json({ error: 'Invalid Plant selected.' });
 
+    // Use UNFORMATTED_VALUE to preserve actual raw numbers
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A:U`
+      range: `${sheetName}!A:U`,
+      valueRenderOption: 'UNFORMATTED_VALUE'
     });
     const data = response.data.values || [];
     
@@ -81,40 +122,61 @@ app.post('/api/previous-readings', async (req, res) => {
     const existingDailyReadings = {};
     const targetDateIso = targetDate ? formatDateIso(targetDate) : '';
 
+    // Track chronological most recent reading prior to targetDate for each register key
+    const lastBeforeTarget = {};
+
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      if (!row[0]) continue;
+      if (row[0] === undefined || row[0] === null || String(row[0]).trim() === '') continue;
       const rowDateIso = formatDateIso(row[0]);
 
       if (isOvertime) {
         if (row[3] === plant) {
           const key = row[4] + '_' + row[5] + '_' + row[6];
+          const presNum = row[10] !== undefined && row[10] !== null && row[10] !== '' && !isNaN(Number(row[10])) ? Number(row[10]) : row[10];
+          const prevNum = row[9] !== undefined && row[9] !== null && row[9] !== '' && !isNaN(Number(row[9])) ? Number(row[9]) : row[9];
+          const diffNum = row[11] !== undefined && row[11] !== null && row[11] !== '' && !isNaN(Number(row[11])) ? Number(row[11]) : 0;
+
           if (targetDateIso && rowDateIso === targetDateIso) {
             existingDailyReadings[key] = {
               submitted: true,
-              prev: row[9],
-              pres: row[10],
-              diff: row[11],
+              prev: prevNum,
+              pres: presNum,
+              diff: diffNum,
               remarks: row[20] || ''
             };
-          } else {
-            lastReadings[key] = row[10];
+          } else if (!targetDateIso || (rowDateIso && rowDateIso < targetDateIso)) {
+            if (!lastBeforeTarget[key] || rowDateIso >= lastBeforeTarget[key].date) {
+              lastBeforeTarget[key] = { date: rowDateIso, reading: presNum };
+            }
           }
         }
       } else {
         const key = row[3] + '_' + row[4] + '_' + row[5];
+        const presNum = row[9] !== undefined && row[9] !== null && row[9] !== '' && !isNaN(Number(row[9])) ? Number(row[9]) : row[9];
+        const prevNum = row[8] !== undefined && row[8] !== null && row[8] !== '' && !isNaN(Number(row[8])) ? Number(row[8]) : row[8];
+        const diffNum = row[10] !== undefined && row[10] !== null && row[10] !== '' && !isNaN(Number(row[10])) ? Number(row[10]) : 0;
+
         if (targetDateIso && rowDateIso === targetDateIso) {
           existingDailyReadings[key] = {
             submitted: true,
-            prev: row[8],
-            pres: row[9],
-            diff: row[10]
+            prev: prevNum,
+            pres: presNum,
+            diff: diffNum
           };
-        } else {
-          lastReadings[key] = row[9];
+        } else if (!targetDateIso || (rowDateIso && rowDateIso < targetDateIso)) {
+          if (!lastBeforeTarget[key] || rowDateIso >= lastBeforeTarget[key].date) {
+            lastBeforeTarget[key] = { date: rowDateIso, reading: presNum };
+          }
         }
       }
     }
+
+    // Populate lastReadings with the exact reading from the previous entry date
+    for (const k in lastBeforeTarget) {
+      lastReadings[k] = lastBeforeTarget[k].reading;
+    }
+
     res.json({ lastReadings, existingDailyReadings });
   } catch (err) {
     console.error('Error in /api/previous-readings:', err);
@@ -122,7 +184,7 @@ app.post('/api/previous-readings', async (req, res) => {
   }
 });
 
-// Endpoint: Submit Bulk Data
+// Endpoint: Submit Bulk Data (Enforces single daily entry per register, allows remaining entries)
 app.post('/api/submit-data', async (req, res) => {
   try {
     const { payload, clientInfo } = req.body;
@@ -137,7 +199,8 @@ app.post('/api/submit-data', async (req, res) => {
 
     const getRes = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A:G`
+      range: `${sheetName}!A:G`,
+      valueRenderOption: 'UNFORMATTED_VALUE'
     });
     const data = getRes.data.values || [];
     const targetDateIso = formatDateIso(records[0].date);
@@ -177,9 +240,21 @@ app.post('/api/submit-data', async (req, res) => {
       const rowRemark = (rec.remarks && String(rec.remarks).trim() !== '') ? String(rec.remarks).trim() : (remarks || '');
 
       if (isOvertime) {
-        return [rec.date, month, year, plant, rec.section, rec.utility, rec.source, rec.equip, unit, prevReading, presReading, difference, kwh, m3, ltr, kg, difference, unitCost, totalBdt, totalUsd, rowRemark];
+        return [
+          rec.date, month, year, plant,
+          rec.section, rec.utility, rec.source, rec.equip, unit,
+          prevReading, presReading, difference,
+          kwh, m3, ltr, kg,
+          difference, unitCost, totalBdt, totalUsd, rowRemark
+        ];
       } else {
-        return [rec.date, month, year, rec.section, rec.utility, rec.source, rec.equip, unit, prevReading, presReading, difference, kwh, m3, ltr, kg, difference, unitCost, totalBdt, totalUsd];
+        return [
+          rec.date, month, year,
+          rec.section, rec.utility, rec.source, rec.equip, unit,
+          prevReading, presReading, difference,
+          kwh, m3, ltr, kg,
+          difference, unitCost, totalBdt, totalUsd
+        ];
       }
     });
 
@@ -280,6 +355,29 @@ app.post('/api/adjustment', async (req, res) => {
       }
     });
 
+    // Also record event to central audit Logs sheet
+    try {
+      const dateStr = now.toISOString().split('T')[0];
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CONFIG.LOGS_SHEET_NAME}!A:A`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [[
+            dateStr,
+            timeStr,
+            plant,
+            targetDate,
+            'Adjustment Request Submitted',
+            `[${requestId}] Register: ${register} | Wrong: ${wrongVal || 'N/A'} | Correct: ${correctVal || 'N/A'} | Reason: ${reason} | Staff: ${staffName} (${phone})`,
+            0, '', 'Unknown', 'Unknown', 'Desktop', 'Unknown', 'Unknown', ''
+          ]]
+        }
+      });
+    } catch (e) {
+      console.warn('Logging adjustment failed:', e.message);
+    }
+
     res.json({
       success: true,
       requestId: requestId,
@@ -350,12 +448,13 @@ app.get('/api/dashboard', async (req, res) => {
         const sheetName = plantSheetMap[plant];
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${sheetName}!A:R`
+          range: `${sheetName}!A:R`,
+          valueRenderOption: 'UNFORMATTED_VALUE'
         });
         const data = response.data.values || [];
         for (let i = 1; i < data.length; i++) {
           const row = data[i];
-          if (!row[0]) continue;
+          if (row[0] === undefined || row[0] === null || String(row[0]).trim() === '') continue;
           actualRecords.push({
             date: formatDateIso(row[0]),
             plant: plant,
@@ -381,7 +480,8 @@ app.get('/api/dashboard', async (req, res) => {
     try {
       const bRes = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: '01_Records!A:Q'
+        range: '01_Records!A:Q',
+        valueRenderOption: 'UNFORMATTED_VALUE'
       });
       const bData = bRes.data.values || [];
       const months = ['Jul-26', 'Aug-26', 'Sep-26', 'Oct-26', 'Nov-26', 'Dec-26', 'Jan-27', 'Feb-27', 'Mar-27', 'Apr-27', 'May-27', 'Jun-27'];
@@ -391,10 +491,10 @@ app.get('/api/dashboard', async (req, res) => {
         const monthlyObj = {};
         for (let m = 0; m < months.length; m++) {
           const cellVal = row[4 + m];
-          monthlyObj[months[m]] = typeof cellVal === 'number' ? cellVal : (parseFloat(String(cellVal || 0).replace(/,/g, '')) || 0);
+          monthlyObj[months[m]] = typeof cellVal === 'number' ? cellVal : (parseFloat(String(cellVal || 0).replace(/[^0-9.-]+/g, '')) || 0);
         }
         const totalCell = row[16];
-        const parsedTotal = typeof totalCell === 'number' ? totalCell : (parseFloat(String(totalCell || 0).replace(/,/g, '')) || 0);
+        const parsedTotal = typeof totalCell === 'number' ? totalCell : (parseFloat(String(totalCell || 0).replace(/[^0-9.-]+/g, '')) || 0);
         budgetRecords.push({
           plant: String(row[0]).trim(),
           section: row[1] ? String(row[1]).trim() : '',
@@ -419,7 +519,12 @@ app.get('/api/dashboard', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}/`);
-  console.log(`Using Google Sheets API with Spreadsheet ID: ${SPREADSHEET_ID}`);
-});
+// Export app for serverless platforms like Vercel
+module.exports = app;
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}/`);
+    console.log(`Using Google Sheets API with Spreadsheet ID: ${SPREADSHEET_ID}`);
+  });
+}
