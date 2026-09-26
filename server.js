@@ -47,16 +47,16 @@ if (Redis && redisUrl) {
     redisClient.connect()
       .then(() => {
         redisConnected = true;
-        console.log('⚡ Redis Cache connected successfully.');
+        console.log('[Cache] Redis Cache connected successfully.');
       })
       .catch(err => {
-        console.warn('⚠️ Redis connection failed, using In-Memory Cache fallback:', err.message);
+        console.warn('[Warning] Redis connection failed, using In-Memory Cache fallback:', err.message);
         redisConnected = false;
       });
 
     redisClient.on('error', (err) => {
       if (redisConnected) {
-        console.warn('⚠️ Redis runtime error, falling back to In-Memory:', err.message);
+        console.warn('[Warning] Redis runtime error, falling back to In-Memory:', err.message);
       }
       redisConnected = false;
     });
@@ -65,7 +65,7 @@ if (Redis && redisUrl) {
       redisConnected = true;
     });
   } catch (err) {
-    console.warn('⚠️ Could not initialize Redis client, using In-Memory Cache:', err.message);
+    console.warn('[Warning] Could not initialize Redis client, using In-Memory Cache:', err.message);
   }
 }
 
@@ -775,9 +775,9 @@ if (require.main === module) {
     console.log(`Server running at http://localhost:${PORT}/`);
     console.log(`Using Google Sheets API with Spreadsheet ID: ${SPREADSHEET_ID}`);
     if (redisConnected) {
-      console.log('⚡ Redis Caching: ACTIVE');
+      console.log('[Cache] Redis Caching: ACTIVE');
     } else {
-      console.log('⚡ High-Speed In-Memory Caching: ACTIVE');
+      console.log('[Cache] High-Speed In-Memory Caching: ACTIVE');
     }
   });
 }
