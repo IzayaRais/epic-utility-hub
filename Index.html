@@ -3269,6 +3269,11 @@
            SIGN-IN GATE
            Covers the whole app until /api/session confirms an active session.
            ========================================================================== */
+        /* ==========================================================================
+           SIGN-IN GATE: ULTRA-MODERN CORPORATE EXPERIENCE
+           Covers the whole app until /api/session confirms an active session.
+           Features faded corporate backdrop, glowing ambient lights, and glassmorphism.
+           ========================================================================== */
         .auth-gate {
             position: fixed;
             inset: 0;
@@ -3276,105 +3281,309 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
-            background: linear-gradient(140deg, #001B44 0%, #003087 55%, #00204F 100%);
+            padding: 24px;
+            overflow-y: auto;
+            background-color: #001233;
+        }
+
+        /* Faded corporate background image layer */
+        .auth-bg-layer {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                radial-gradient(ellipse 90% 70% at 50% 0%, rgba(0, 168, 255, 0.22) 0%, transparent 65%),
+                radial-gradient(ellipse 80% 60% at 85% 90%, rgba(0, 71, 186, 0.28) 0%, transparent 65%),
+                linear-gradient(145deg, rgba(1, 14, 38, 0.88) 0%, rgba(0, 30, 84, 0.84) 50%, rgba(0, 15, 45, 0.94) 100%),
+                url('/login-bg.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Ambient floating light orbs */
+        .auth-orb {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .auth-orb-1 {
+            top: 6%;
+            left: 10%;
+            width: 440px;
+            height: 440px;
+            background: radial-gradient(circle, rgba(0, 180, 255, 0.22) 0%, rgba(0, 80, 220, 0.06) 55%, transparent 70%);
+            filter: blur(65px);
+            animation: orbFloat1 20s ease-in-out infinite alternate;
+        }
+
+        .auth-orb-2 {
+            bottom: 8%;
+            right: 8%;
+            width: 480px;
+            height: 480px;
+            background: radial-gradient(circle, rgba(0, 50, 170, 0.3) 0%, rgba(14, 165, 233, 0.08) 60%, transparent 75%);
+            filter: blur(75px);
+            animation: orbFloat2 24s ease-in-out infinite alternate;
+        }
+
+        @keyframes orbFloat1 {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(50px, 35px) scale(1.1); }
+            100% { transform: translate(-30px, 60px) scale(0.95); }
+        }
+
+        @keyframes orbFloat2 {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-45px, -40px) scale(1.06); }
+            100% { transform: translate(25px, -50px) scale(0.94); }
+        }
+
+        /* Subtle high-tech grid overlay */
+        .auth-grid-overlay {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 38px 38px;
+            mask-image: radial-gradient(ellipse at center, rgba(0,0,0,0.9) 35%, rgba(0,0,0,0) 80%);
+            -webkit-mask-image: radial-gradient(ellipse at center, rgba(0,0,0,0.9) 35%, rgba(0,0,0,0) 80%);
+            pointer-events: none;
+            z-index: 3;
         }
 
         .auth-card {
+            position: relative;
+            z-index: 10;
             width: 100%;
-            max-width: 400px;
-            background: #FFFFFF;
-            border-radius: 16px;
-            padding: 30px 28px 26px;
-            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+            max-width: 430px;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.85);
+            border-radius: 24px;
+            padding: 34px 32px 30px;
+            box-shadow: 
+                0 30px 70px -15px rgba(0, 15, 50, 0.55),
+                0 0 0 1px rgba(0, 48, 135, 0.08),
+                0 10px 30px -5px rgba(0, 71, 186, 0.15);
+            animation: authCardEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
-        .auth-emblem {
-            width: 46px;
-            height: 46px;
-            border-radius: 11px;
-            background: var(--epic-blue, #003087);
+        @keyframes authCardEnter {
+            0% { opacity: 0; transform: scale(0.96) translateY(14px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* Brand & Logo Presentation */
+        .auth-brand-wrap {
             display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            margin-bottom: 22px;
+        }
+
+        .auth-logo-badge {
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 16px;
+            background: #FFFFFF;
+            padding: 12px 24px;
+            border-radius: 18px;
+            box-shadow: 
+                0 6px 20px -3px rgba(0, 48, 135, 0.12),
+                0 0 0 1px rgba(0, 48, 135, 0.08);
+            margin-bottom: 14px;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
 
-        .auth-emblem i {
-            width: 24px;
-            height: 24px;
-            color: #FFFFFF;
+        .auth-logo-badge:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                0 10px 26px -3px rgba(0, 48, 135, 0.18),
+                0 0 0 1px rgba(0, 48, 135, 0.14);
+        }
+
+        .auth-epic-logo {
+            height: 64px;
+            max-width: 220px;
+            width: auto;
+            object-fit: contain;
+            display: block;
+        }
+
+        .auth-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 4px 12px;
+            background: rgba(0, 48, 135, 0.06);
+            border: 1px solid rgba(0, 48, 135, 0.12);
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #003087;
+            letter-spacing: 0.02em;
+            margin-bottom: 10px;
+        }
+
+        .auth-live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #10B981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+            animation: pulseDot 2s infinite ease-in-out;
+        }
+
+        @keyframes pulseDot {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.25); opacity: 0.7; }
         }
 
         .auth-title {
-            font-size: 19px;
+            font-size: 20px;
             font-weight: 800;
             color: #0F172A;
-            letter-spacing: -0.01em;
+            letter-spacing: -0.02em;
             margin-bottom: 4px;
         }
 
         .auth-sub {
             font-size: 12.5px;
             color: #64748B;
-            margin-bottom: 22px;
             line-height: 1.5;
+            max-width: 320px;
+            margin: 0 auto;
         }
 
         .auth-label {
-            display: block;
-            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11.5px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #475569;
+            letter-spacing: 0.06em;
+            color: #334155;
             margin-bottom: 6px;
+        }
+
+        .auth-field-group {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .auth-field-icon {
+            position: absolute;
+            left: 13px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 17px;
+            height: 17px;
+            color: #64748B;
+            pointer-events: none;
+            transition: color 0.15s ease;
         }
 
         .auth-field {
             width: 100%;
-            padding: 11px 13px;
+            padding: 12px 14px 12px 40px;
             font-size: 14px;
+            font-weight: 500;
             font-family: inherit;
             border: 1.5px solid #CBD5E1;
-            border-radius: 9px;
+            border-radius: 11px;
             background: #FFFFFF;
             color: #0F172A;
-            margin-bottom: 15px;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+        }
+
+        .auth-field:hover {
+            border-color: #94A3B8;
         }
 
         .auth-field:focus {
             outline: none;
-            border-color: var(--epic-blue, #003087);
-            box-shadow: 0 0 0 3px rgba(0, 48, 135, 0.12);
+            border-color: #003087;
+            box-shadow: 0 0 0 3.5px rgba(0, 48, 135, 0.14);
+            background: #FFFFFF;
+        }
+
+        .auth-field-group:focus-within .auth-field-icon {
+            color: #003087;
+        }
+
+        .auth-pass-toggle {
+            position: absolute;
+            right: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            padding: 5px;
+            cursor: pointer;
+            color: #94A3B8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: color 0.15s ease, background-color 0.15s ease;
+        }
+
+        .auth-pass-toggle:hover {
+            color: #003087;
+            background: rgba(0, 48, 135, 0.05);
+        }
+
+        .auth-pass-toggle svg,
+        .auth-pass-toggle i {
+            width: 17px;
+            height: 17px;
         }
 
         .auth-submit {
+            position: relative;
+            overflow: hidden;
             width: 100%;
-            padding: 12px;
-            font-size: 14px;
+            padding: 13px 18px;
+            font-size: 14.5px;
             font-weight: 700;
             font-family: inherit;
             color: #FFFFFF;
-            background: var(--epic-blue, #003087);
+            background: linear-gradient(135deg, #002566 0%, #003087 50%, #004ecc 100%);
             border: none;
-            border-radius: 9px;
+            border-radius: 11px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            transition: background 0.15s ease;
+            gap: 9px;
+            box-shadow: 0 6px 20px -3px rgba(0, 48, 135, 0.35);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            margin-top: 4px;
         }
 
         .auth-submit:hover:not(:disabled) {
-            background: #002060;
+            transform: translateY(-1.5px);
+            box-shadow: 0 10px 25px -3px rgba(0, 48, 135, 0.45);
+            background: linear-gradient(135deg, #00225d 0%, #00389d 50%, #0056e0 100%);
+        }
+
+        .auth-submit:active:not(:disabled) {
+            transform: translateY(0.5px);
+            box-shadow: 0 4px 12px -2px rgba(0, 48, 135, 0.3);
         }
 
         .auth-submit:disabled {
             opacity: 0.65;
             cursor: not-allowed;
+            transform: none;
         }
 
         .auth-error {
@@ -3384,20 +3593,38 @@
             color: #B91C1C;
             background: #FEF2F2;
             border: 1px solid #FECACA;
-            border-radius: 8px;
-            padding: 9px 11px;
-            margin-bottom: 15px;
+            border-radius: 10px;
+            padding: 10px 13px;
+            margin-bottom: 16px;
             line-height: 1.45;
+            box-shadow: 0 2px 8px rgba(185, 28, 28, 0.08);
+            animation: shakeError 0.35s ease;
+        }
+
+        @keyframes shakeError {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-4px); }
+            40%, 80% { transform: translateX(4px); }
         }
 
         .auth-foot {
-            margin-top: 18px;
-            padding-top: 14px;
+            margin-top: 20px;
+            padding-top: 16px;
             border-top: 1px solid #E2E8F0;
-            font-size: 11px;
-            color: #94A3B8;
+            font-size: 11.5px;
+            color: #64748B;
             text-align: center;
-            line-height: 1.5;
+            line-height: 1.55;
+        }
+
+        .auth-foot-note {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 4px;
         }
 
         /* Sign-out control in the application footer */
@@ -3425,6 +3652,10 @@
         @media (max-width: 480px) {
             .auth-card {
                 padding: 26px 20px 22px;
+                border-radius: 20px;
+            }
+            .auth-epic-logo {
+                height: 52px;
             }
         }
     </style>
@@ -3439,39 +3670,73 @@
          make is rejected server-side without a valid session cookie.
          ========================================================================== -->
     <div class="auth-gate" id="authGate" style="display:none;">
+        <div class="auth-bg-layer"></div>
+        <div class="auth-orb auth-orb-1"></div>
+        <div class="auth-orb auth-orb-2"></div>
+        <div class="auth-grid-overlay"></div>
+
         <div class="auth-card">
-            <div class="auth-emblem"><i data-lucide="zap"></i></div>
-            <div class="auth-title">EPIC Utility Hub</div>
-            <div class="auth-sub">
-                Central Engineering &bull; Enter your facility access code to open the utility register.
+            <!-- Brand Identity Container -->
+            <div class="auth-brand-wrap">
+                <div class="auth-logo-badge">
+                    <img src="/epic-logo.png" 
+                         alt="EPIC Group — Relentless pursuit of better" 
+                         class="auth-epic-logo"
+                         id="authEpicLogo"
+                         onerror="this.onerror=null; this.src='epic-logo.png';">
+                </div>
+                <div class="auth-status-pill">
+                    <span class="auth-live-dot"></span>
+                    <span>Central Engineering &bull; Live Gateway</span>
+                </div>
+                <h1 class="auth-title">EPIC UTILITY HUB</h1>
+                <p class="auth-sub">Energy &amp; Resource Consumption Monitoring System</p>
             </div>
 
             <div class="auth-error" id="authError"></div>
 
             <form id="authForm" autocomplete="off">
-                <label class="auth-label" for="authPlant">Facility</label>
-                <select class="auth-field" id="authPlant" required>
-                    <option value="CIPL">CIPL &mdash; Cosmopolitan Industries Pvt. Ltd.</option>
-                    <option value="EGMCL 1">EGMCL 1 &mdash; Epic Garments Mfg. (Unit 1)</option>
-                    <option value="EGMCL 2">EGMCL 2 &mdash; Epic Garments Mfg. (Unit 2)</option>
-                    <option value="EGMCL 7">EGMCL 7 &mdash; Epic Garments Mfg. (Unit 7)</option>
-                    <option value="PGCL">PGCL &mdash; Pearl Garments Company Ltd.</option>
-                    <option value="GTL">GTL &mdash; Green Textile Ltd.</option>
-                </select>
+                <label class="auth-label" for="authPlant">
+                    <span>Manufacturing Facility</span>
+                    <span style="font-weight:600; font-size:10.5px; color:#64748B;">6 Plants Active</span>
+                </label>
+                <div class="auth-field-group">
+                    <i data-lucide="building-2" class="auth-field-icon"></i>
+                    <select class="auth-field" id="authPlant" required>
+                        <option value="CIPL">CIPL &mdash; Cosmopolitan Industries Pvt. Ltd.</option>
+                        <option value="EGMCL 1">EGMCL 1 &mdash; Epic Garments Mfg. (Unit 1)</option>
+                        <option value="EGMCL 2">EGMCL 2 &mdash; Epic Garments Mfg. (Unit 2)</option>
+                        <option value="EGMCL 7">EGMCL 7 &mdash; Epic Garments Mfg. (Unit 7)</option>
+                        <option value="PGCL">PGCL &mdash; Pearl Garments Company Ltd.</option>
+                        <option value="GTL">GTL &mdash; Green Textile Ltd.</option>
+                    </select>
+                </div>
 
-                <label class="auth-label" for="authCode">Access Code</label>
-                <input class="auth-field" id="authCode" type="password" required
-                    autocomplete="current-password" placeholder="Facility or administrator code">
+                <label class="auth-label" for="authCode">
+                    <span>Access Code</span>
+                    <span style="font-weight:600; font-size:10.5px; color:#64748B;">Encrypted</span>
+                </label>
+                <div class="auth-field-group">
+                    <i data-lucide="key-round" class="auth-field-icon"></i>
+                    <input class="auth-field" id="authCode" type="password" required
+                        autocomplete="current-password" placeholder="Facility or administrator code" style="padding-right: 42px;">
+                    <button type="button" class="auth-pass-toggle" id="authPassToggle" title="Toggle password visibility" onclick="toggleAuthPassVisibility()">
+                        <i data-lucide="eye" id="authPassIcon"></i>
+                    </button>
+                </div>
 
                 <button class="auth-submit" type="submit" id="authSubmit">
-                    <i data-lucide="log-in" style="width:15px;height:15px;"></i>
-                    <span id="authSubmitText">Open Register</span>
+                    <i data-lucide="log-in" style="width:16px;height:16px;"></i>
+                    <span id="authSubmitText">Open Utility Register</span>
                 </button>
             </form>
 
             <div class="auth-foot">
-                Administrators: any facility may be selected with the administrator code.<br>
-                Contact Central Engineering if your code is not working.
+                <div class="auth-foot-note">
+                    <i data-lucide="shield-check" style="width:14px;height:14px;color:#003087;"></i>
+                    <span>Authorized Personnel Only</span>
+                </div>
+                <div>Central Engineering code unlocks all plants &bull; Contact Central Engineering if assistance is required.</div>
             </div>
         </div>
     </div>
@@ -3482,7 +3747,7 @@
     <header class="navbar">
         <div class="brand" onclick="goHome()" title="Return to Plant Selection">
             <div class="brand-mark">
-                <img src="data:image/png;base64,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"
+                <img src="/epic-logo.png"
                     alt="EPIC Group Logo"
                     onerror="this.style.display='none'; document.getElementById('svgBrandLogo').style.display='inline-flex';">
                 <div id="svgBrandLogo" style="display:none; align-items:center; gap:6px;">
@@ -4398,6 +4663,20 @@
 
         function canOpenPlant(plant) {
             return authorizedPlants.indexOf(plant) !== -1;
+        }
+
+        function toggleAuthPassVisibility() {
+            const input = document.getElementById('authCode');
+            const icon = document.getElementById('authPassIcon');
+            if (!input) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                if (icon) icon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                input.type = 'password';
+                if (icon) icon.setAttribute('data-lucide', 'eye');
+            }
+            initIcons();
         }
 
         function showAuthGate(message) {

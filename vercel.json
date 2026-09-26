@@ -7,6 +7,8 @@
       "config": {
         "includeFiles": [
           "Index.html",
+          "epic-logo.png",
+          "login-bg.jpg",
           "config/**",
           "lib/**"
         ]

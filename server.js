@@ -810,6 +810,28 @@ function serveIndexHtml(res) {
   }
 }
 
+// Allowed static image assets for branding and background
+const ALLOWED_IMAGES = {
+  '/epic-logo.png': 'image/png',
+  '/login-bg.jpg': 'image/jpeg',
+  '/login-bg.jpeg': 'image/jpeg',
+  '/login-bg.png': 'image/png',
+  '/favicon.ico': 'image/png'
+};
+
+for (const [routePath, mimeType] of Object.entries(ALLOWED_IMAGES)) {
+  app.get(routePath, (req, res) => {
+    const filename = routePath === '/favicon.ico' ? 'epic-logo.png' : routePath.slice(1);
+    const fullPath = path.join(__dirname, filename);
+    if (fs.existsSync(fullPath)) {
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(fullPath);
+    }
+    return res.status(404).end();
+  });
+}
+
 app.get('/', (req, res) => serveIndexHtml(res));
 
 // Unmatched /api/* must 404 as JSON rather than fall through to the SPA.
