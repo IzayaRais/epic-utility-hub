@@ -18,6 +18,77 @@
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
+    <!-- Google Apps Script to Direct API Bridge Adapter -->
+    <script>
+        window.google = window.google || {};
+        window.google.script = window.google.script || {};
+        window.google.script.run = (function () {
+            function createRunner(successHandler, failureHandler) {
+                return {
+                    withSuccessHandler(sh) {
+                        return createRunner(sh, failureHandler);
+                    },
+                    withFailureHandler(fh) {
+                        return createRunner(successHandler, fh);
+                    },
+                    fetchAllPreviousReadings(plant, isOT, selectedDate) {
+                        fetch('/api/previous-readings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ plant, isOvertime: isOT, targetDate: selectedDate })
+                        })
+                        .then(r => {
+                            if (!r.ok) throw new Error('Network response was not ok');
+                            return r.json();
+                        })
+                        .then(data => { if (successHandler) successHandler(data); })
+                        .catch(err => { if (failureHandler) failureHandler(err); });
+                    },
+                    submitBulkData(payload, clientInfo) {
+                        fetch('/api/submit-data', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ payload, clientInfo })
+                        })
+                        .then(r => {
+                            if (!r.ok) throw new Error('Failed to submit bulk data');
+                            return r.json();
+                        })
+                        .then(data => { if (successHandler) successHandler(data.message || data); })
+                        .catch(err => { if (failureHandler) failureHandler(err); });
+                    },
+                    submitAdjustmentRequest(payload) {
+                        fetch('/api/adjustment', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        })
+                        .then(r => r.json())
+                        .then(data => { if (successHandler) successHandler(data); })
+                        .catch(err => { if (failureHandler) failureHandler(err); });
+                    },
+                    logActivity(logData) {
+                        fetch('/api/log-activity', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(logData)
+                        }).catch(e => console.warn('Logging error:', e));
+                    },
+                    getDashboardData() {
+                        fetch('/api/dashboard')
+                        .then(r => {
+                            if (!r.ok) throw new Error('Failed to fetch dashboard');
+                            return r.json();
+                        })
+                        .then(data => { if (successHandler) successHandler(data); })
+                        .catch(err => { if (failureHandler) failureHandler(err); });
+                    }
+                };
+            }
+            return createRunner();
+        })();
+    </script>
+
     <style>
         /* ==========================================================================
            CENTRALIZED DESIGN SYSTEM TOKENS (EPIC Group Brand Identity)
