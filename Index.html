@@ -3361,12 +3361,10 @@
             z-index: 10;
             width: 100%;
             max-width: 430px;
-            background: rgba(255, 255, 255, 0.94);
-            backdrop-filter: blur(24px) saturate(180%);
-            -webkit-backdrop-filter: blur(24px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.85);
+            background: #FFFFFF;
+            border: 1px solid rgba(255, 255, 255, 0.9);
             border-radius: 24px;
-            padding: 34px 32px 30px;
+            padding: 36px 32px 30px;
             box-shadow: 
                 0 30px 70px -15px rgba(0, 15, 50, 0.55),
                 0 0 0 1px rgba(0, 48, 135, 0.08),
@@ -3379,71 +3377,23 @@
             100% { opacity: 1; transform: scale(1) translateY(0); }
         }
 
-        /* Brand & Logo Presentation */
+        /* Brand & Logo Presentation - Clean & Flat */
         .auth-brand-wrap {
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
-            margin-bottom: 22px;
-        }
-
-        .auth-logo-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: #FFFFFF;
-            padding: 12px 24px;
-            border-radius: 18px;
-            box-shadow: 
-                0 6px 20px -3px rgba(0, 48, 135, 0.12),
-                0 0 0 1px rgba(0, 48, 135, 0.08);
-            margin-bottom: 14px;
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-        }
-
-        .auth-logo-badge:hover {
-            transform: translateY(-2px);
-            box-shadow: 
-                0 10px 26px -3px rgba(0, 48, 135, 0.18),
-                0 0 0 1px rgba(0, 48, 135, 0.14);
+            margin-bottom: 24px;
         }
 
         .auth-epic-logo {
-            height: 64px;
-            max-width: 220px;
+            height: 80px;
+            max-width: 240px;
             width: auto;
             object-fit: contain;
             display: block;
-        }
-
-        .auth-status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 7px;
-            padding: 4px 12px;
-            background: rgba(0, 48, 135, 0.06);
-            border: 1px solid rgba(0, 48, 135, 0.12);
-            border-radius: 100px;
-            font-size: 11px;
-            font-weight: 700;
-            color: #003087;
-            letter-spacing: 0.02em;
-            margin-bottom: 10px;
-        }
-
-        .auth-live-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: #10B981;
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
-            animation: pulseDot 2s infinite ease-in-out;
-        }
-
-        @keyframes pulseDot {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.25); opacity: 0.7; }
+            margin: 0 auto 14px auto;
+            mix-blend-mode: multiply;
         }
 
         .auth-title {
@@ -3678,17 +3628,11 @@
         <div class="auth-card">
             <!-- Brand Identity Container -->
             <div class="auth-brand-wrap">
-                <div class="auth-logo-badge">
-                    <img src="/epic-logo.png" 
-                         alt="EPIC Group — Relentless pursuit of better" 
-                         class="auth-epic-logo"
-                         id="authEpicLogo"
-                         onerror="this.onerror=null; this.src='epic-logo.png';">
-                </div>
-                <div class="auth-status-pill">
-                    <span class="auth-live-dot"></span>
-                    <span>Central Engineering &bull; Live Gateway</span>
-                </div>
+                <img src="/epic-logo.png" 
+                     alt="EPIC Group — Relentless pursuit of better" 
+                     class="auth-epic-logo"
+                     id="authEpicLogo"
+                     onerror="this.onerror=null; this.src='epic-logo.png';">
                 <h1 class="auth-title">EPIC UTILITY HUB</h1>
                 <p class="auth-sub">Energy &amp; Resource Consumption Monitoring System</p>
             </div>
