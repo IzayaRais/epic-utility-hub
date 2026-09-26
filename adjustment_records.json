@@ -1,0 +1,36 @@
+[
+  {
+    "requestId": "REQ-20260926-4174",
+    "timestamp": "2026-09-26 10:03:38",
+    "plant": "EGMCL 1",
+    "shiftType": "Regular",
+    "targetDate": "2026-09-26",
+    "register": "General / Not Specified",
+    "wrongValue": "",
+    "correctValue": "15800.5",
+    "reason": "Keying / Typo Error in Reading",
+    "staffName": "Md. Rafiqul / Assistant Engineer",
+    "phone": "+880 1712-345678",
+    "status": "Pending Review",
+    "adminRemarks": "",
+    "reviewedBy": "",
+    "reviewDate": ""
+  },
+  {
+    "requestId": "REQ-20260926-3006",
+    "timestamp": "2026-09-26 09:58:37",
+    "plant": "EGMCL 1",
+    "shiftType": "Regular",
+    "targetDate": "2026-09-26",
+    "register": "Sewing • Electricity",
+    "wrongValue": "12400",
+    "correctValue": "14200",
+    "reason": "Typo during entry",
+    "staffName": "Test Eng",
+    "phone": "01700000000",
+    "status": "Pending Review",
+    "adminRemarks": "",
+    "reviewedBy": "",
+    "reviewDate": ""
+  }
+]
