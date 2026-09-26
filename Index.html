@@ -5553,12 +5553,11 @@
             if (meta) meta.textContent = 'Reading every facility sheet…';
 
             try {
-                if (force) {
-                    // Clearing the cache makes Refresh mean "re-read the sheets",
-                    // not "show me the same 2-minute-old snapshot".
-                    await fetch('/api/cache/clear', { method: 'POST', credentials: 'same-origin' });
-                }
-                const res = await fetch('/api/records', { credentials: 'same-origin' });
+                // ?fresh=1 drops only this view's cache entry. A full
+                // /api/cache/clear would also wipe every plant's cached
+                // readings and make each operator's next lookup hit Sheets.
+                const res = await fetch('/api/records' + (force ? '?fresh=1' : ''),
+                    { credentials: 'same-origin' });
                 if (res.status === 401) { handleAuthExpiry(); return; }
                 if (res.status === 403) {
                     if (meta) meta.textContent = 'This view requires an administrator session.';

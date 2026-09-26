@@ -820,92 +820,84 @@ app.get('/api/records',
   async (req, res) => {
     try {
       const cacheKey = 'records:all';
-      const cached = await cacheGet(cacheKey);
-      if (cached) {
-        res.set('X-Cache', 'HIT');
-        return res.json(cached);
-      }
 
-      const records = [];
-
-      for (const plant of registers.PLANTS) {
-        try {
-          const r = await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
-            range: `${registers.PLANT_SHEET_MAP[plant]}!A:T`,
-            valueRenderOption: 'UNFORMATTED_VALUE'
-          });
-          records.push(...mapPlantRows(r.data.values || [], plant));
-        } catch (e) {
-          console.warn(`Records: could not read ${plant}:`, e.message);
+      // ?fresh=1 is the Refresh button. It drops ONLY this view's cache entry.
+      // It must never call cacheFlush(): that would also wipe every plant's
+      // readings:* entry and push each operator's next lookup back to a live
+      // Sheets read, for no benefit to the admin refreshing this page.
+      if (req.query.fresh === '1') {
+        await cacheDel('records:');
+      } else {
+        const cached = await cacheGet(cacheKey);
+        if (cached) {
+          res.set('X-Cache', 'HIT');
+          return res.json(cached);
         }
       }
 
-      try {
-        const r = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: 'Overtime!A:U',
-          valueRenderOption: 'UNFORMATTED_VALUE'
-        });
-        records.push(...mapOvertimeRows(r.data.values || []));
-      } catch (e) {
-        console.warn('Records: could not read Overtime:', e.message);
-      }
+      // All nine sheet reads are independent, so issue them together rather
+      // than one after another. Sequentially this took ~4s; the Sheets read
+      // quota (60/min for this service account) comfortably absorbs the burst.
+      const readSheet = async (range, renderOption, label) => {
+        try {
+          const r = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range,
+            valueRenderOption: renderOption
+          });
+          return r.data.values || [];
+        } catch (e) {
+          console.warn(`Records: could not read ${label}:`, e.message);
+          return [];
+        }
+      };
+
+      const [plantData, overtimeData, adjustmentData, logData] = await Promise.all([
+        Promise.all(registers.PLANTS.map(plant =>
+          readSheet(`${registers.PLANT_SHEET_MAP[plant]}!A:T`, 'UNFORMATTED_VALUE', plant)
+            .then(rows => mapPlantRows(rows, plant))
+        )),
+        readSheet('Overtime!A:U', 'UNFORMATTED_VALUE', 'Overtime'),
+        // Adjustments and Logs are read FORMATTED: their date/time columns were
+        // written as text and parsed by Sheets into serials, and the display
+        // string is what an admin actually wants to read.
+        readSheet(`${CONFIG.ADJUSTMENT_SHEET_NAME}!A:O`, 'FORMATTED_VALUE', 'adjustments'),
+        readSheet(`${CONFIG.LOGS_SHEET_NAME}!A:N`, 'FORMATTED_VALUE', 'logs')
+      ]);
+
+      const records = [].concat(...plantData, mapOvertimeRows(overtimeData));
 
       // Newest first -- an admin opening this wants today's entries on top.
       records.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
-      // Adjustments and Logs are read FORMATTED: their date/time columns were
-      // written as text and parsed by Sheets into serials, and the display
-      // string is what an admin actually wants to read.
-      let adjustments = [];
-      try {
-        const r = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${CONFIG.ADJUSTMENT_SHEET_NAME}!A:O`,
-          valueRenderOption: 'FORMATTED_VALUE'
+      const adjustments = [];
+      for (let i = 1; i < adjustmentData.length; i++) {
+        const a = adjustmentData[i];
+        if (!a[0]) continue;
+        adjustments.push({
+          requestId: a[0] || '', timestamp: a[1] || '', plant: a[2] || '',
+          shiftType: a[3] || '', targetDate: a[4] || '', register: a[5] || '',
+          wrongValue: a[6] || '', correctValue: a[7] || '', reason: a[8] || '',
+          staffName: a[9] || '', phone: a[10] || '', status: a[11] || 'Pending Review',
+          adminRemarks: a[12] || '', reviewedBy: a[13] || '', reviewDate: a[14] || ''
         });
-        const data = r.data.values || [];
-        for (let i = 1; i < data.length; i++) {
-          const a = data[i];
-          if (!a[0]) continue;
-          adjustments.push({
-            requestId: a[0] || '', timestamp: a[1] || '', plant: a[2] || '',
-            shiftType: a[3] || '', targetDate: a[4] || '', register: a[5] || '',
-            wrongValue: a[6] || '', correctValue: a[7] || '', reason: a[8] || '',
-            staffName: a[9] || '', phone: a[10] || '', status: a[11] || 'Pending Review',
-            adminRemarks: a[12] || '', reviewedBy: a[13] || '', reviewDate: a[14] || ''
-          });
-        }
-        adjustments.reverse();
-      } catch (e) {
-        console.warn('Records: could not read adjustments:', e.message);
       }
+      adjustments.reverse();
 
       let logs = [];
-      try {
-        const r = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${CONFIG.LOGS_SHEET_NAME}!A:N`,
-          valueRenderOption: 'FORMATTED_VALUE'
+      for (let i = 1; i < logData.length; i++) {
+        const l = logData[i];
+        if (!l[0]) continue;
+        logs.push({
+          date: l[0] || '', time: l[1] || '', plant: l[2] || '',
+          entryDate: l[3] || '', action: l[4] || '', details: l[5] || '',
+          records: l[6] || '', duration: l[7] || '', ip: l[8] || '',
+          device: l[10] || '', browser: l[11] || '', os: l[12] || ''
         });
-        const data = r.data.values || [];
-        for (let i = 1; i < data.length; i++) {
-          const l = data[i];
-          if (!l[0]) continue;
-          logs.push({
-            date: l[0] || '', time: l[1] || '', plant: l[2] || '',
-            entryDate: l[3] || '', action: l[4] || '', details: l[5] || '',
-            records: l[6] || '', duration: l[7] || '', ip: l[8] || '',
-            device: l[10] || '', browser: l[11] || '', os: l[12] || ''
-          });
-        }
-        // Most recent first, capped: this sheet grows without bound.
-        logs.reverse();
-        logs = logs.slice(0, LOG_ROWS_RETURNED);
-      } catch (e) {
-        console.warn('Records: could not read logs:', e.message);
       }
+      // Most recent first, capped: this sheet grows without bound.
+      logs.reverse();
+      logs = logs.slice(0, LOG_ROWS_RETURNED);
 
       const payload = {
         generatedAt: getBDTime().fullStr,
