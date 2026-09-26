@@ -1,0 +1,8 @@
+# Never upload these to the deployment, even if they exist locally.
+# credentials.json is also gitignored; this is defence in depth for CLI deploys.
+credentials.json
+.env
+*.xlsx
+adjustment_records.json
+code.gs
+CLAUDE.md

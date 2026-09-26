@@ -12,17 +12,56 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
 
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Lucide Icons -- pinned to an exact version with a Subresource Integrity
+         hash. "@latest" meant the CDN could serve different code on any given
+         day, with full script access to the page and its session cookie. If the
+         bytes ever stop matching this hash the browser refuses to run them. -->
+    <script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"
+        integrity="sha384-hK2uiaqTSh/v1VqRxmuMQL4xmt5n0DdyBCOItx2fAs7Wv+WC8Tu0yDW1j12JooyM"
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"></script>
 
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-    <!-- Google Apps Script to Direct API Bridge Adapter -->
+    <!-- Google Apps Script to Direct API Bridge Adapter
+         The page was written against Apps Script's google.script.run, so this
+         shim keeps that call shape and forwards to the Express API. Adding a
+         backend call means adding a method here AND a route in server.js. -->
     <script>
         window.google = window.google || {};
         window.google.script = window.google.script || {};
         window.google.script.run = (function () {
+
+            /**
+             * One place for every API call, so authentication and error
+             * reporting behave identically everywhere.
+             *  - credentials: 'same-origin' sends the HttpOnly session cookie.
+             *  - 401 means the 12-hour session lapsed: re-show the sign-in gate
+             *    rather than surfacing a confusing failure.
+             *  - The server's own message is surfaced, so a validation error
+             *    reads "Unknown register for CIPL" instead of "Network error".
+             */
+            function apiCall(url, options) {
+                return fetch(url, Object.assign({ credentials: 'same-origin' }, options))
+                    .then(r => r.json().catch(() => ({})).then(data => {
+                        if (r.status === 401) {
+                            if (typeof handleAuthExpiry === 'function') handleAuthExpiry();
+                            throw new Error('Your session has expired. Please sign in again.');
+                        }
+                        if (!r.ok) {
+                            throw new Error(data.message || data.error || `Request failed (${r.status}).`);
+                        }
+                        return data;
+                    }));
+            }
+
+            function postJson(url, body) {
+                return apiCall(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+            }
+
             function createRunner(successHandler, failureHandler) {
                 return {
                     withSuccessHandler(sh) {
@@ -32,56 +71,23 @@
                         return createRunner(successHandler, fh);
                     },
                     fetchAllPreviousReadings(plant, isOT, selectedDate) {
-                        fetch('/api/previous-readings', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ plant, isOvertime: isOT, targetDate: selectedDate })
-                        })
-                        .then(r => {
-                            if (!r.ok) throw new Error('Network response was not ok');
-                            return r.json();
-                        })
-                        .then(data => { if (successHandler) successHandler(data); })
-                        .catch(err => { if (failureHandler) failureHandler(err); });
+                        postJson('/api/previous-readings', { plant, isOvertime: isOT, targetDate: selectedDate })
+                            .then(data => { if (successHandler) successHandler(data); })
+                            .catch(err => { if (failureHandler) failureHandler(err); });
                     },
                     submitBulkData(payload, clientInfo) {
-                        fetch('/api/submit-data', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ payload, clientInfo })
-                        })
-                        .then(r => {
-                            if (!r.ok) throw new Error('Failed to submit bulk data');
-                            return r.json();
-                        })
-                        .then(data => { if (successHandler) successHandler(data.message || data); })
-                        .catch(err => { if (failureHandler) failureHandler(err); });
+                        postJson('/api/submit-data', { payload, clientInfo })
+                            .then(data => { if (successHandler) successHandler(data.message || data); })
+                            .catch(err => { if (failureHandler) failureHandler(err); });
                     },
                     submitAdjustmentRequest(payload) {
-                        fetch('/api/adjustment', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        })
-                        .then(r => r.json())
-                        .then(data => { if (successHandler) successHandler(data); })
-                        .catch(err => { if (failureHandler) failureHandler(err); });
+                        postJson('/api/adjustment', payload)
+                            .then(data => { if (successHandler) successHandler(data); })
+                            .catch(err => { if (failureHandler) failureHandler(err); });
                     },
                     logActivity(logData) {
-                        fetch('/api/log-activity', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(logData)
-                        }).catch(e => console.warn('Logging error:', e));
-                    },
-                    getDashboardData() {
-                        fetch('/api/dashboard')
-                        .then(r => {
-                            if (!r.ok) throw new Error('Failed to fetch dashboard');
-                            return r.json();
-                        })
-                        .then(data => { if (successHandler) successHandler(data); })
-                        .catch(err => { if (failureHandler) failureHandler(err); });
+                        postJson('/api/log-activity', logData)
+                            .catch(e => console.warn('Logging error:', e.message));
                     }
                 };
             }
@@ -3258,10 +3264,217 @@
             margin-top: 4px;
             word-break: break-all;
         }
+
+        /* ==========================================================================
+           SIGN-IN GATE
+           Covers the whole app until /api/session confirms an active session.
+           ========================================================================== */
+        .auth-gate {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(140deg, #001B44 0%, #003087 55%, #00204F 100%);
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 400px;
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 30px 28px 26px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+        }
+
+        .auth-emblem {
+            width: 46px;
+            height: 46px;
+            border-radius: 11px;
+            background: var(--epic-blue, #003087);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .auth-emblem i {
+            width: 24px;
+            height: 24px;
+            color: #FFFFFF;
+        }
+
+        .auth-title {
+            font-size: 19px;
+            font-weight: 800;
+            color: #0F172A;
+            letter-spacing: -0.01em;
+            margin-bottom: 4px;
+        }
+
+        .auth-sub {
+            font-size: 12.5px;
+            color: #64748B;
+            margin-bottom: 22px;
+            line-height: 1.5;
+        }
+
+        .auth-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+
+        .auth-field {
+            width: 100%;
+            padding: 11px 13px;
+            font-size: 14px;
+            font-family: inherit;
+            border: 1.5px solid #CBD5E1;
+            border-radius: 9px;
+            background: #FFFFFF;
+            color: #0F172A;
+            margin-bottom: 15px;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .auth-field:focus {
+            outline: none;
+            border-color: var(--epic-blue, #003087);
+            box-shadow: 0 0 0 3px rgba(0, 48, 135, 0.12);
+        }
+
+        .auth-submit {
+            width: 100%;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            font-family: inherit;
+            color: #FFFFFF;
+            background: var(--epic-blue, #003087);
+            border: none;
+            border-radius: 9px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.15s ease;
+        }
+
+        .auth-submit:hover:not(:disabled) {
+            background: #002060;
+        }
+
+        .auth-submit:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+        .auth-error {
+            display: none;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #B91C1C;
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            border-radius: 8px;
+            padding: 9px 11px;
+            margin-bottom: 15px;
+            line-height: 1.45;
+        }
+
+        .auth-foot {
+            margin-top: 18px;
+            padding-top: 14px;
+            border-top: 1px solid #E2E8F0;
+            font-size: 11px;
+            color: #94A3B8;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        /* Sign-out control in the application footer */
+        .footer-signout {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 11px;
+            font-size: 11.5px;
+            font-weight: 600;
+            font-family: inherit;
+            color: #475569;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: border-color 0.15s ease, color 0.15s ease;
+        }
+
+        .footer-signout:hover {
+            border-color: #FCA5A5;
+            color: #B91C1C;
+        }
+
+        @media (max-width: 480px) {
+            .auth-card {
+                padding: 26px 20px 22px;
+            }
+        }
     </style>
 </head>
 
 <body>
+
+    <!-- ==========================================================================
+         SIGN-IN GATE
+         Rendered on top of everything until a session is confirmed. The app
+         markup below stays in the DOM but is unusable: every API call it can
+         make is rejected server-side without a valid session cookie.
+         ========================================================================== -->
+    <div class="auth-gate" id="authGate" style="display:none;">
+        <div class="auth-card">
+            <div class="auth-emblem"><i data-lucide="zap"></i></div>
+            <div class="auth-title">EPIC Utility Hub</div>
+            <div class="auth-sub">
+                Central Engineering &bull; Enter your facility access code to open the utility register.
+            </div>
+
+            <div class="auth-error" id="authError"></div>
+
+            <form id="authForm" autocomplete="off">
+                <label class="auth-label" for="authPlant">Facility</label>
+                <select class="auth-field" id="authPlant" required>
+                    <option value="CIPL">CIPL &mdash; Cosmopolitan Industries Pvt. Ltd.</option>
+                    <option value="EGMCL 1">EGMCL 1 &mdash; Epic Garments Mfg. (Unit 1)</option>
+                    <option value="EGMCL 2">EGMCL 2 &mdash; Epic Garments Mfg. (Unit 2)</option>
+                    <option value="EGMCL 7">EGMCL 7 &mdash; Epic Garments Mfg. (Unit 7)</option>
+                    <option value="PGCL">PGCL &mdash; Pearl Garments Company Ltd.</option>
+                    <option value="GTL">GTL &mdash; Green Textile Ltd.</option>
+                </select>
+
+                <label class="auth-label" for="authCode">Access Code</label>
+                <input class="auth-field" id="authCode" type="password" required
+                    autocomplete="current-password" placeholder="Facility or administrator code">
+
+                <button class="auth-submit" type="submit" id="authSubmit">
+                    <i data-lucide="log-in" style="width:15px;height:15px;"></i>
+                    <span id="authSubmitText">Open Register</span>
+                </button>
+            </form>
+
+            <div class="auth-foot">
+                Administrators: any facility may be selected with the administrator code.<br>
+                Contact Central Engineering if your code is not working.
+            </div>
+        </div>
+    </div>
 
     <!-- ==========================================================================
          APPLICATION SHELL: COMPACT CORPORATE NAVBAR
@@ -3930,20 +4143,27 @@
                 </div>
             </div>
 
-            <!-- Footer Action Controls: Audit CSV & System Cache Diagnostics -->
+            <!-- Footer Action Controls: Audit CSV & System Cache Diagnostics.
+                 The CSV export and the diagnostics modal are administrator-only
+                 server-side; they are hidden for plant sessions so operators are
+                 not offered a button that would only return 403. -->
             <div class="footer-actions">
-                <a href="/api/export-csv" class="footer-action-btn export-audit-btn" title="Download consolidated utility audit CSV across all 6 plants" download>
+                <a href="/api/export-csv" id="footerExportCsv" class="footer-action-btn export-audit-btn" title="Download consolidated utility audit CSV across all 6 plants" style="display:none;" download>
                     <i data-lucide="download" style="width:13px; height:13px; color:var(--epic-blue);"></i>
                     <span>Audit CSV</span>
                 </a>
-                <button type="button" class="footer-action-btn system-status-pill" onclick="openSystemHealthModal()" title="View Redis/Cache & Google Sheets API Diagnostics">
+                <button type="button" id="footerDiagnostics" class="footer-action-btn system-status-pill" onclick="openSystemHealthModal()" title="View Redis/Cache &amp; Google Sheets API Diagnostics" style="display:none;">
                     <span class="pulse-dot-green"></span>
-                    <span id="cacheStatusLabel">High-Speed In-Memory Cache</span>
+                    <span id="cacheStatusLabel">System Diagnostics</span>
                 </button>
                 <div class="footer-live-badge">
                     <span class="status-dot"></span>
-                    <span>Live Grid Connected</span>
+                    <span id="footerSessionLabel">Live Grid Connected</span>
                 </div>
+                <button type="button" class="footer-signout" id="footerSignOut" onclick="signOut()" title="End this session" style="display:none;">
+                    <i data-lucide="log-out" style="width:12px; height:12px;"></i>
+                    <span>Sign Out</span>
+                </button>
             </div>
         </div>
     </footer>
@@ -3954,6 +4174,25 @@
     <script>
         // Official Conversion Rate (1 USD = 123 BDT matching Enterprise Engineering standard)
         const USD_RATE = 123;
+
+        /**
+         * Escape text before it is interpolated into an HTML string.
+         *
+         * Remarks come back from the Google Sheet, where any operator can put
+         * arbitrary text. Dropped raw into an attribute, a remark containing a
+         * double quote can close the attribute and open an event handler --
+         * stored XSS that fires for whoever opens that register next.
+         * Every interpolation of sheet-sourced text must go through this.
+         */
+        function escapeHtml(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
         // Official Plant Metadata (Locations & Full Corporate Names)
         const plantDescriptions = {
@@ -4093,1059 +4332,6 @@
         let draftSaveTimeout = null;
         let pendingRestoredDraft = null;
 
-        // Dashboard State
-        let currentDashMode = 'actual'; // 'actual' | 'budget'
-        let dashboardData = []; // Actual consumption records
-        let filteredDashData = [];
-        let budgetRecordsData = []; // Allocated budget records from 01_Records
-        let filteredBudgetData = [];
-
-        // Chart instances
-        let trendChartInstance = null;
-        let plantChartInstance = null;
-        let utilityChartInstance = null;
-        let sourceChartInstance = null;
-        let budgetTrendChartInstance = null;
-        let budgetCategoryChartInstance = null;
-        let budgetPlantChartInstance = null;
-
-        // Controlled Corporate Palette (EPIC Blue & Harmony)
-        const EPIC_COLORS = {
-            blue: '#003087',
-            navy: '#002060',
-            sky: '#0284C7',
-            teal: '#0D9488',
-            slate: '#64748B',
-            amber: '#D97706',
-            palette: ['#003087', '#0284C7', '#0D9488', '#64748B', '#D97706', '#475569', '#2563EB', '#059669']
-        };
-
-        // Embedded baseline budget records from 01_Records
-        const defaultBudgetRecords = [
-            {
-                "plant": "PGCL",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 3160.33,
-                    "Aug-26": 2926.23,
-                    "Sep-26": 3043.28,
-                    "Oct-26": 3160.33,
-                    "Nov-26": 1463.11,
-                    "Dec-26": 1521.64,
-                    "Jan-27": 1404.59,
-                    "Feb-27": 1346.07,
-                    "Mar-27": 2692.13,
-                    "Apr-27": 2458.03,
-                    "May-27": 2926.23,
-                    "Jun-27": 2223.93
-                },
-                "total": 28325.90164
-            },
-            {
-                "plant": "PGCL",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "REB(Non BEPZA)",
-                "months": {
-                    "Jul-26": 13869.8,
-                    "Aug-26": 12947.29,
-                    "Sep-26": 14540.88,
-                    "Oct-26": 14307.63,
-                    "Nov-26": 13939.43,
-                    "Dec-26": 10845.25,
-                    "Jan-27": 10055.64,
-                    "Feb-27": 10862.77,
-                    "Mar-27": 12227.61,
-                    "Apr-27": 11900.86,
-                    "May-27": 14057.15,
-                    "Jun-27": 10517.76
-                },
-                "total": 150072.0623
-            },
-            {
-                "plant": "PGCL",
-                "section": "Apparel",
-                "utility": "Steam",
-                "source": "Canteen NG",
-                "months": {
-                    "Jul-26": 66.39,
-                    "Aug-26": 61.48,
-                    "Sep-26": 63.93,
-                    "Oct-26": 66.39,
-                    "Nov-26": 61.48,
-                    "Dec-26": 63.93,
-                    "Jan-27": 59.02,
-                    "Feb-27": 56.56,
-                    "Mar-27": 56.56,
-                    "Apr-27": 51.64,
-                    "May-27": 61.48,
-                    "Jun-27": 46.72
-                },
-                "total": 715.5737705
-            },
-            {
-                "plant": "PGCL",
-                "section": "Apparel",
-                "utility": "Steam",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 1758.63,
-                    "Aug-26": 1628.36,
-                    "Sep-26": 1693.5,
-                    "Oct-26": 1758.63,
-                    "Nov-26": 1628.36,
-                    "Dec-26": 1693.5,
-                    "Jan-27": 1563.23,
-                    "Feb-27": 1498.09,
-                    "Mar-27": 1498.09,
-                    "Apr-27": 1367.82,
-                    "May-27": 1628.36,
-                    "Jun-27": 1237.55
-                },
-                "total": 18954.11803
-            },
-            {
-                "plant": "PGCL",
-                "section": "Apparel",
-                "utility": "Steam",
-                "source": "LPG",
-                "months": {
-                    "Jul-26": 6155.2,
-                    "Aug-26": 5699.26,
-                    "Sep-26": 5927.23,
-                    "Oct-26": 6155.2,
-                    "Nov-26": 5699.26,
-                    "Dec-26": 5927.23,
-                    "Jan-27": 5471.29,
-                    "Feb-27": 5243.32,
-                    "Mar-27": 5243.32,
-                    "Apr-27": 4787.38,
-                    "May-27": 5699.26,
-                    "Jun-27": 4331.44
-                },
-                "total": 66339.41311
-            },
-            {
-                "plant": "EGMCL 2",
-                "section": "Apparel",
-                "utility": "Water",
-                "source": "BEPZA Water",
-                "months": {
-                    "Jul-26": 1481.26,
-                    "Aug-26": 1371.54,
-                    "Sep-26": 1426.4,
-                    "Oct-26": 1481.26,
-                    "Nov-26": 1266.04,
-                    "Dec-26": 1316.68,
-                    "Jan-27": 1215.4,
-                    "Feb-27": 1164.75,
-                    "Mar-27": 1261.82,
-                    "Apr-27": 1152.09,
-                    "May-27": 1371.54,
-                    "Jun-27": 1042.37
-                },
-                "total": 15551.15307
-            },
-            {
-                "plant": "EGMCL 2",
-                "section": "Apparel",
-                "utility": "Waste Water BEPZA",
-                "source": "Toilet Flash Water",
-                "months": {
-                    "Jul-26": 886.81,
-                    "Aug-26": 821.12,
-                    "Sep-26": 853.97,
-                    "Oct-26": 886.81,
-                    "Nov-26": 757.96,
-                    "Dec-26": 788.28,
-                    "Jan-27": 727.64,
-                    "Feb-27": 697.32,
-                    "Mar-27": 755.43,
-                    "Apr-27": 689.74,
-                    "May-27": 821.12,
-                    "Jun-27": 624.05
-                },
-                "total": 9310.258217
-            },
-            {
-                "plant": "EGMCL 2",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 389.77,
-                    "Aug-26": 360.9,
-                    "Sep-26": 375.34,
-                    "Oct-26": 389.77,
-                    "Nov-26": 360.9,
-                    "Dec-26": 375.34,
-                    "Jan-27": 346.47,
-                    "Feb-27": 332.03,
-                    "Mar-27": 332.03,
-                    "Apr-27": 303.16,
-                    "May-27": 360.9,
-                    "Jun-27": 274.29
-                },
-                "total": 4200.895082
-            },
-            {
-                "plant": "EGMCL 2",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "REB(BEPZA)",
-                "months": {
-                    "Jul-26": 11878.17,
-                    "Aug-26": 11054.0,
-                    "Sep-26": 11466.0,
-                    "Oct-26": 11878.0,
-                    "Nov-26": 11054.0,
-                    "Dec-26": 9523.0,
-                    "Jan-27": 8848.0,
-                    "Feb-27": 8511.0,
-                    "Mar-27": 10230.0,
-                    "Apr-27": 9405.0,
-                    "May-27": 11054.0,
-                    "Jun-27": 8581.0
-                },
-                "total": 123482.1746
-            },
-            {
-                "plant": "EGMCL 2",
-                "section": "Apparel",
-                "utility": "Steam",
-                "source": "NG",
-                "months": {
-                    "Jul-26": 1767.16,
-                    "Aug-26": 1645.0,
-                    "Sep-26": 1710.0,
-                    "Oct-26": 1774.0,
-                    "Nov-26": 1645.0,
-                    "Dec-26": 1710.0,
-                    "Jan-27": 1581.0,
-                    "Feb-27": 1516.0,
-                    "Mar-27": 1516.0,
-                    "Apr-27": 1387.0,
-                    "May-27": 1645.0,
-                    "Jun-27": 1259.0
-                },
-                "total": 19155.1593
-            },
-            {
-                "plant": "CIPL",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 1073.1,
-                    "Aug-26": 993.61,
-                    "Sep-26": 1033.35,
-                    "Oct-26": 1033.35,
-                    "Nov-26": 993.61,
-                    "Dec-26": 1033.35,
-                    "Jan-27": 953.86,
-                    "Feb-27": 914.12,
-                    "Mar-27": 914.12,
-                    "Apr-27": 834.63,
-                    "May-27": 993.61,
-                    "Jun-27": 755.14
-                },
-                "total": 11525.83607
-            },
-            {
-                "plant": "CIPL",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "REB(Non BEPZA)",
-                "months": {
-                    "Jul-26": 1061.65,
-                    "Aug-26": 1009.33,
-                    "Sep-26": 1035.49,
-                    "Oct-26": 1035.49,
-                    "Nov-26": 1009.33,
-                    "Dec-26": 1035.49,
-                    "Jan-27": 983.17,
-                    "Feb-27": 957.01,
-                    "Mar-27": 957.01,
-                    "Apr-27": 904.69,
-                    "May-27": 1009.33,
-                    "Jun-27": 852.37
-                },
-                "total": 11850.36075
-            },
-            {
-                "plant": "CIPL",
-                "section": "Apparel",
-                "utility": "Steam",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 1129.57,
-                    "Aug-26": 1045.9,
-                    "Sep-26": 1087.74,
-                    "Oct-26": 1087.74,
-                    "Nov-26": 1045.9,
-                    "Dec-26": 1087.74,
-                    "Jan-27": 1004.07,
-                    "Feb-27": 962.23,
-                    "Mar-27": 962.23,
-                    "Apr-27": 878.56,
-                    "May-27": 1045.9,
-                    "Jun-27": 794.89
-                },
-                "total": 12132.45902
-            },
-            {
-                "plant": "CIPL",
-                "section": "Apparel",
-                "utility": "Steam",
-                "source": "NG",
-                "months": {
-                    "Jul-26": 22035.75,
-                    "Aug-26": 20433.19,
-                    "Sep-26": 21234.47,
-                    "Oct-26": 21234.47,
-                    "Nov-26": 20433.19,
-                    "Dec-26": 21234.47,
-                    "Jan-27": 19631.91,
-                    "Feb-27": 18830.63,
-                    "Mar-27": 18830.63,
-                    "Apr-27": 17228.08,
-                    "May-27": 20433.19,
-                    "Jun-27": 15625.52
-                },
-                "total": 237185.4995
-            },
-            {
-                "plant": "CIPL",
-                "section": "Washing",
-                "utility": "Electricity",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 877.99,
-                    "Aug-26": 812.95,
-                    "Sep-26": 845.47,
-                    "Oct-26": 845.47,
-                    "Nov-26": 812.95,
-                    "Dec-26": 845.47,
-                    "Jan-27": 780.43,
-                    "Feb-27": 747.91,
-                    "Mar-27": 747.91,
-                    "Apr-27": 682.88,
-                    "May-27": 812.95,
-                    "Jun-27": 617.84
-                },
-                "total": 9430.216885
-            },
-            {
-                "plant": "CIPL",
-                "section": "Washing",
-                "utility": "Electricity",
-                "source": "REB(Non BEPZA)",
-                "months": {
-                    "Jul-26": 868.62,
-                    "Aug-26": 825.82,
-                    "Sep-26": 847.22,
-                    "Oct-26": 847.22,
-                    "Nov-26": 825.82,
-                    "Dec-26": 847.22,
-                    "Jan-27": 804.41,
-                    "Feb-27": 783.01,
-                    "Mar-27": 783.01,
-                    "Apr-27": 740.2,
-                    "May-27": 825.82,
-                    "Jun-27": 697.4
-                },
-                "total": 9695.773344
-            },
-            {
-                "plant": "CIPL",
-                "section": "Washing",
-                "utility": "Steam",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 924.2,
-                    "Aug-26": 855.74,
-                    "Sep-26": 889.97,
-                    "Oct-26": 889.97,
-                    "Nov-26": 855.74,
-                    "Dec-26": 889.97,
-                    "Jan-27": 821.51,
-                    "Feb-27": 787.28,
-                    "Mar-27": 787.28,
-                    "Apr-27": 718.82,
-                    "May-27": 855.74,
-                    "Jun-27": 650.36
-                },
-                "total": 9926.576721
-            },
-            {
-                "plant": "CIPL",
-                "section": "Washing",
-                "utility": "Steam",
-                "source": "NG",
-                "months": {
-                    "Jul-26": 18029.25,
-                    "Aug-26": 16718.06,
-                    "Sep-26": 17373.66,
-                    "Oct-26": 17373.66,
-                    "Nov-26": 16718.06,
-                    "Dec-26": 17373.66,
-                    "Jan-27": 16062.47,
-                    "Feb-27": 15406.88,
-                    "Mar-27": 15406.88,
-                    "Apr-27": 14095.7,
-                    "May-27": 16718.06,
-                    "Jun-27": 12784.52
-                },
-                "total": 194060.8632
-            },
-            {
-                "plant": "CIPL",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "NG",
-                "months": {
-                    "Jul-26": 28024.13,
-                    "Aug-26": 25966.52,
-                    "Sep-26": 26995.33,
-                    "Oct-26": 26995.33,
-                    "Nov-26": 22108.49,
-                    "Dec-26": 22982.98,
-                    "Jan-27": 21234.01,
-                    "Feb-27": 20359.52,
-                    "Mar-27": 23908.91,
-                    "Apr-27": 21851.29,
-                    "May-27": 25966.52,
-                    "Jun-27": 19793.68
-                },
-                "total": 286186.7067
-            },
-            {
-                "plant": "CIPL",
-                "section": "Washing",
-                "utility": "Electricity",
-                "source": "NG",
-                "months": {
-                    "Jul-26": 22928.84,
-                    "Aug-26": 21245.33,
-                    "Sep-26": 22087.08,
-                    "Oct-26": 22087.08,
-                    "Nov-26": 18088.77,
-                    "Dec-26": 18804.26,
-                    "Jan-27": 17373.28,
-                    "Feb-27": 16657.79,
-                    "Mar-27": 19561.83,
-                    "Apr-27": 17878.33,
-                    "May-27": 21245.33,
-                    "Jun-27": 16194.83
-                },
-                "total": 234152.7601
-            },
-            {
-                "plant": "GTL",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 13980.0,
-                    "Aug-26": 13442.81,
-                    "Sep-26": 13980.53,
-                    "Oct-26": 10554.39,
-                    "Nov-26": 10976.57,
-                    "Dec-26": 10554.39,
-                    "Jan-27": 9710.04,
-                    "Feb-27": 9710.04,
-                    "Mar-27": 8443.51,
-                    "Apr-27": 10132.22,
-                    "May-27": 7599.16,
-                    "Jun-27": 10554.39
-                },
-                "total": 129638.05
-            },
-            {
-                "plant": "GTL",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "REB(Non BEPZA)",
-                "months": {
-                    "Jul-26": 58145.0,
-                    "Aug-26": 55975.8,
-                    "Sep-26": 58144.79,
-                    "Oct-26": 48936.6,
-                    "Nov-26": 38809.45,
-                    "Dec-26": 37369.66,
-                    "Jan-27": 34490.07,
-                    "Feb-27": 40828.43,
-                    "Mar-27": 39424.23,
-                    "Apr-27": 47034.13,
-                    "May-27": 35619.28,
-                    "Jun-27": 48936.6
-                },
-                "total": 543714.04
-            },
-            {
-                "plant": "GTL",
-                "section": "Apparel",
-                "utility": "Steam",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 13602.44,
-                    "Aug-26": 13079.27,
-                    "Sep-26": 13602.44,
-                    "Oct-26": 15213.1,
-                    "Nov-26": 15821.62,
-                    "Dec-26": 15213.1,
-                    "Jan-27": 13996.05,
-                    "Feb-27": 13996.05,
-                    "Mar-27": 12170.48,
-                    "Apr-27": 14604.57,
-                    "May-27": 10953.43,
-                    "Jun-27": 15213.1
-                },
-                "total": 167465.6392
-            },
-            {
-                "plant": "GTL",
-                "section": "Apparel",
-                "utility": "Steam",
-                "source": "Jhute",
-                "months": {
-                    "Jul-26": 4565.0,
-                    "Aug-26": 4390.24,
-                    "Sep-26": 4565.85,
-                    "Oct-26": 4390.24,
-                    "Nov-26": 4565.85,
-                    "Dec-26": 4390.24,
-                    "Jan-27": 4039.02,
-                    "Feb-27": 4039.02,
-                    "Mar-27": 3512.2,
-                    "Apr-27": 4214.63,
-                    "May-27": 3160.98,
-                    "Jun-27": 4390.24
-                },
-                "total": 50223.51
-            },
-            {
-                "plant": "GTL",
-                "section": "Washing",
-                "utility": "Electricity",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 4728.0,
-                    "Aug-26": 4546.0,
-                    "Sep-26": 4728.0,
-                    "Oct-26": 8624.0,
-                    "Nov-26": 8921.0,
-                    "Dec-26": 8624.0,
-                    "Jan-27": 6839.0,
-                    "Feb-27": 6839.0,
-                    "Mar-27": 5947.0,
-                    "Apr-27": 8326.0,
-                    "May-27": 5353.0,
-                    "Jun-27": 8921.0
-                },
-                "total": 82396.0
-            },
-            {
-                "plant": "GTL",
-                "section": "Washing",
-                "utility": "Electricity",
-                "source": "REB(Non BEPZA)",
-                "months": {
-                    "Jul-26": 19662.17,
-                    "Aug-26": 18929.0,
-                    "Sep-26": 19662.0,
-                    "Oct-26": 39985.0,
-                    "Nov-26": 31542.0,
-                    "Dec-26": 30534.0,
-                    "Jan-27": 24294.0,
-                    "Feb-27": 28758.0,
-                    "Mar-27": 27769.0,
-                    "Apr-27": 38651.0,
-                    "May-27": 25089.0,
-                    "Jun-27": 41364.0
-                },
-                "total": 346239.1711
-            },
-            {
-                "plant": "GTL",
-                "section": "Washing",
-                "utility": "Steam",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 3670.5,
-                    "Aug-26": 3736.93,
-                    "Sep-26": 4102.32,
-                    "Oct-26": 21848.91,
-                    "Nov-26": 22602.32,
-                    "Dec-26": 21848.91,
-                    "Jan-27": 16606.42,
-                    "Feb-27": 16606.42,
-                    "Mar-27": 14440.37,
-                    "Apr-27": 20216.52,
-                    "May-27": 12996.33,
-                    "Jun-27": 21660.55
-                },
-                "total": 180336.4989
-            },
-            {
-                "plant": "GTL",
-                "section": "Washing",
-                "utility": "Steam",
-                "source": "Jhute",
-                "months": {
-                    "Jul-26": 20945.0,
-                    "Aug-26": 21324.0,
-                    "Sep-26": 23409.0,
-                    "Oct-26": 32981.0,
-                    "Nov-26": 34118.0,
-                    "Dec-26": 32981.0,
-                    "Jan-27": 25068.0,
-                    "Feb-27": 25068.0,
-                    "Mar-27": 21798.0,
-                    "Apr-27": 30517.0,
-                    "May-27": 19618.0,
-                    "Jun-27": 32697.0
-                },
-                "total": 320524.0
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "REB(BEPZA)",
-                "months": {
-                    "Jul-26": 46730.71,
-                    "Aug-26": 41793.21,
-                    "Sep-26": 55782.8,
-                    "Oct-26": 55782.8,
-                    "Nov-26": 41897.67,
-                    "Dec-26": 38851.17,
-                    "Jan-27": 37327.92,
-                    "Feb-27": 40147.37,
-                    "Mar-27": 43439.04,
-                    "Apr-27": 51668.22,
-                    "May-27": 39324.45,
-                    "Jun-27": 53725.51
-                },
-                "total": 546470.8638
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 1430.46,
-                    "Aug-26": 1271.52,
-                    "Sep-26": 1377.48,
-                    "Oct-26": 1377.48,
-                    "Nov-26": 1377.48,
-                    "Dec-26": 1271.52,
-                    "Jan-27": 1218.54,
-                    "Feb-27": 1218.54,
-                    "Mar-27": 1059.6,
-                    "Apr-27": 1271.52,
-                    "May-27": 953.64,
-                    "Jun-27": 1324.5
-                },
-                "total": 15152.28117
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "NG",
-                "months": {
-                    "Jul-26": 18782.53,
-                    "Aug-26": 16707.8,
-                    "Sep-26": 18090.96,
-                    "Oct-26": 18090.96,
-                    "Nov-26": 18090.96,
-                    "Dec-26": 16707.8,
-                    "Jan-27": 16016.23,
-                    "Feb-27": 16016.23,
-                    "Mar-27": 13941.5,
-                    "Apr-27": 16707.8,
-                    "May-27": 12558.34,
-                    "Jun-27": 17399.38
-                },
-                "total": 199110.4915
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Apparel",
-                "utility": "Steam",
-                "source": "NG",
-                "months": {
-                    "Jul-26": 11179.15,
-                    "Aug-26": 9940.81,
-                    "Sep-26": 13457.96,
-                    "Oct-26": 13457.96,
-                    "Nov-26": 13457.96,
-                    "Dec-26": 12426.01,
-                    "Jan-27": 11910.04,
-                    "Feb-27": 9528.03,
-                    "Mar-27": 10362.12,
-                    "Apr-27": 12426.01,
-                    "May-27": 9330.17,
-                    "Jun-27": 12941.99
-                },
-                "total": 140418.2194
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Apparel",
-                "utility": "Water",
-                "source": "Ground Water",
-                "months": {
-                    "Jul-26": 5586.01,
-                    "Aug-26": 4965.34,
-                    "Sep-26": 6723.9,
-                    "Oct-26": 6723.9,
-                    "Nov-26": 6723.9,
-                    "Dec-26": 6206.68,
-                    "Jan-27": 5948.07,
-                    "Feb-27": 4758.45,
-                    "Mar-27": 5172.23,
-                    "Apr-27": 6206.68,
-                    "May-27": 4655.01,
-                    "Jun-27": 6465.29
-                },
-                "total": 70135.47298
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "Service/Others",
-                "months": {
-                    "Jul-26": 2299.08,
-                    "Aug-26": 2043.63,
-                    "Sep-26": 2767.41,
-                    "Oct-26": 2767.41,
-                    "Nov-26": 2767.41,
-                    "Dec-26": 2554.53,
-                    "Jan-27": 2448.09,
-                    "Feb-27": 1958.48,
-                    "Mar-27": 2128.78,
-                    "Apr-27": 2554.53,
-                    "May-27": 1915.9,
-                    "Jun-27": 2660.97
-                },
-                "total": 28866.228
-            },
-            {
-                "plant": "EGMCL 7",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "REB(BEPZA)",
-                "months": {
-                    "Jul-26": 22421.42,
-                    "Aug-26": 20104.85,
-                    "Sep-26": 26668.45,
-                    "Oct-26": 26668.45,
-                    "Nov-26": 26668.45,
-                    "Dec-26": 14830.32,
-                    "Jan-27": 14277.91,
-                    "Feb-27": 11736.8,
-                    "Mar-27": 20877.04,
-                    "Apr-27": 24737.98,
-                    "May-27": 18946.57,
-                    "Jun-27": 25703.21
-                },
-                "total": 253641.4537
-            },
-            {
-                "plant": "EGMCL 7",
-                "section": "Apparel",
-                "utility": "Electricity",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 1216.29,
-                    "Aug-26": 1081.15,
-                    "Sep-26": 1171.24,
-                    "Oct-26": 1171.24,
-                    "Nov-26": 1093.16,
-                    "Dec-26": 1009.07,
-                    "Jan-27": 967.03,
-                    "Feb-27": 967.03,
-                    "Mar-27": 900.96,
-                    "Apr-27": 1081.15,
-                    "May-27": 810.86,
-                    "Jun-27": 1126.2
-                },
-                "total": 12595.38295
-            },
-            {
-                "plant": "EGMCL 7",
-                "section": "Apparel",
-                "utility": "Water",
-                "source": "BEPZA Water",
-                "months": {
-                    "Jul-26": 3717.94,
-                    "Aug-26": 3304.83,
-                    "Sep-26": 3580.23,
-                    "Oct-26": 3580.23,
-                    "Nov-26": 3580.23,
-                    "Dec-26": 3304.83,
-                    "Jan-27": 3167.13,
-                    "Feb-27": 3167.13,
-                    "Mar-27": 2754.03,
-                    "Apr-27": 3304.83,
-                    "May-27": 2478.62,
-                    "Jun-27": 3442.53
-                },
-                "total": 39382.57777
-            },
-            {
-                "plant": "EGMCL 7",
-                "section": "Apparel",
-                "utility": "Steam",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 16858.12,
-                    "Aug-26": 14984.99,
-                    "Sep-26": 16233.74,
-                    "Oct-26": 16233.74,
-                    "Nov-26": 16233.74,
-                    "Dec-26": 14984.99,
-                    "Jan-27": 14360.62,
-                    "Feb-27": 14360.62,
-                    "Mar-27": 12487.5,
-                    "Apr-27": 14984.99,
-                    "May-27": 11238.75,
-                    "Jun-27": 15609.37
-                },
-                "total": 178571.1802
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Washing",
-                "utility": "Electricity",
-                "source": "REB(BEPZA)",
-                "months": {
-                    "Jul-26": 39301.0,
-                    "Aug-26": 46754.24,
-                    "Sep-26": 50482.99,
-                    "Oct-26": 50482.99,
-                    "Nov-26": 49002.55,
-                    "Dec-26": 45387.68,
-                    "Jan-27": 43580.25,
-                    "Feb-27": 40986.4,
-                    "Mar-27": 39296.74,
-                    "Apr-27": 46754.24,
-                    "May-27": 32475.13,
-                    "Jun-27": 48618.62
-                },
-                "total": 533122.8414
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Washing",
-                "utility": "Electricity",
-                "source": "Service/Others",
-                "months": {
-                    "Jul-26": 1636.32,
-                    "Aug-26": 1787.6,
-                    "Sep-26": 1936.57,
-                    "Oct-26": 1936.57,
-                    "Nov-26": 1936.57,
-                    "Dec-26": 1787.6,
-                    "Jan-27": 1713.12,
-                    "Feb-27": 1564.15,
-                    "Mar-27": 1489.67,
-                    "Apr-27": 1787.6,
-                    "May-27": 1224.12,
-                    "Jun-27": 1862.08
-                },
-                "total": 20661.94962
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Washing",
-                "utility": "Electricity",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 1064.72,
-                    "Aug-26": 982.82,
-                    "Sep-26": 1064.72,
-                    "Oct-26": 1064.72,
-                    "Nov-26": 1064.72,
-                    "Dec-26": 982.82,
-                    "Jan-27": 941.87,
-                    "Feb-27": 941.87,
-                    "Mar-27": 819.01,
-                    "Apr-27": 982.82,
-                    "May-27": 737.11,
-                    "Jun-27": 1023.77
-                },
-                "total": 11670.95742
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Washing",
-                "utility": "Oven",
-                "source": "Diesel",
-                "months": {
-                    "Jul-26": 3935.45,
-                    "Aug-26": 3632.73,
-                    "Sep-26": 3935.45,
-                    "Oct-26": 3935.45,
-                    "Nov-26": 3935.45,
-                    "Dec-26": 3632.73,
-                    "Jan-27": 3481.36,
-                    "Feb-27": 3481.36,
-                    "Mar-27": 3027.27,
-                    "Apr-27": 3632.73,
-                    "May-27": 2724.54,
-                    "Jun-27": 3784.09
-                },
-                "total": 43138.61951
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Washing",
-                "utility": "Electricity",
-                "source": "NG",
-                "months": {
-                    "Jul-26": 12454.45,
-                    "Aug-26": 11502.24,
-                    "Sep-26": 12454.45,
-                    "Oct-26": 12454.45,
-                    "Nov-26": 12454.45,
-                    "Dec-26": 11502.24,
-                    "Jan-27": 11026.14,
-                    "Feb-27": 10067.34,
-                    "Mar-27": 9597.82,
-                    "Apr-27": 11502.24,
-                    "May-27": 7893.82,
-                    "Jun-27": 11978.35
-                },
-                "total": 134888.0133
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Washing",
-                "utility": "Steam",
-                "source": "NG",
-                "months": {
-                    "Jul-26": 12035.01,
-                    "Aug-26": 11112.35,
-                    "Sep-26": 12035.01,
-                    "Oct-26": 12035.01,
-                    "Nov-26": 12035.01,
-                    "Dec-26": 11112.35,
-                    "Jan-27": 10651.03,
-                    "Feb-27": 9724.85,
-                    "Mar-27": 9267.04,
-                    "Apr-27": 11112.35,
-                    "May-27": 7618.78,
-                    "Jun-27": 11573.68
-                },
-                "total": 130312.4886
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Washing",
-                "utility": "Steam",
-                "source": "Thermo",
-                "months": {
-                    "Jul-26": 20845.43,
-                    "Aug-26": 19247.42,
-                    "Sep-26": 20845.43,
-                    "Oct-26": 20845.43,
-                    "Nov-26": 20845.43,
-                    "Dec-26": 19247.42,
-                    "Jan-27": 18448.42,
-                    "Feb-27": 16844.21,
-                    "Mar-27": 16051.42,
-                    "Apr-27": 19247.42,
-                    "May-27": 13196.59,
-                    "Jun-27": 20046.43
-                },
-                "total": 225711.0602
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Washing",
-                "utility": "Steam",
-                "source": "Jhute",
-                "months": {
-                    "Jul-26": 1132.85,
-                    "Aug-26": 1045.71,
-                    "Sep-26": 1132.85,
-                    "Oct-26": 1132.85,
-                    "Nov-26": 1132.85,
-                    "Dec-26": 1045.71,
-                    "Jan-27": 1002.14,
-                    "Feb-27": 914.99,
-                    "Mar-27": 871.42,
-                    "Apr-27": 1045.71,
-                    "May-27": 716.08,
-                    "Jun-27": 1089.28
-                },
-                "total": 12262.4401
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Washing",
-                "utility": "Water",
-                "source": "BEPZA Water",
-                "months": {
-                    "Jul-26": 29454.15,
-                    "Aug-26": 27188.45,
-                    "Sep-26": 29454.15,
-                    "Oct-26": 29454.15,
-                    "Nov-26": 29454.15,
-                    "Dec-26": 27188.45,
-                    "Jan-27": 26055.59,
-                    "Feb-27": 23789.89,
-                    "Mar-27": 22657.04,
-                    "Apr-27": 27188.45,
-                    "May-27": 18618.18,
-                    "Jun-27": 28321.3
-                },
-                "total": 318823.9345
-            },
-            {
-                "plant": "EGMCL 1",
-                "section": "Washing",
-                "utility": "ETP Chemical",
-                "source": "Service/Others",
-                "months": {
-                    "Jul-26": 8238.07,
-                    "Aug-26": 7604.37,
-                    "Sep-26": 8238.07,
-                    "Oct-26": 8238.07,
-                    "Nov-26": 8238.07,
-                    "Dec-26": 7604.37,
-                    "Jan-27": 7287.52,
-                    "Feb-27": 7287.52,
-                    "Mar-27": 6336.98,
-                    "Apr-27": 7604.37,
-                    "May-27": 5703.28,
-                    "Jun-27": 7921.22
-                },
-                "total": 90301.91356
-            }
-        ];
-
-        // Embedded sample actual records for offline/local standalone mode
-        const defaultSampleActual = [
-            { date: '2026-09-24', plant: 'CIPL', section: 'Apparel', utility: 'Electricity', source: 'REB(BEPZA)', unit: 'kWh', kwh: 12500, m3: 0, ltr: 0, kg: 0, cost: 154375 },
-            { date: '2026-09-24', plant: 'CIPL', section: 'Apparel', utility: 'Steam', source: 'NG', unit: 'M3', kwh: 0, m3: 840, ltr: 0, kg: 0, cost: 30072 },
-            { date: '2026-09-24', plant: 'CIPL', section: 'Apparel', utility: 'Water', source: 'BEPZA Water', unit: 'M3', kwh: 0, m3: 210, ltr: 0, kg: 0, cost: 9891 },
-            { date: '2026-09-25', plant: 'EGMCL 1', section: 'Apparel', utility: 'Electricity', source: 'REB(BEPZA)', unit: 'kWh', kwh: 10400, m3: 0, ltr: 0, kg: 0, cost: 128440 },
-            { date: '2026-09-25', plant: 'EGMCL 1', section: 'Apparel', utility: 'Diesel', source: 'Generator', unit: 'Ltr', kwh: 0, m3: 0, ltr: 140, kg: 0, cost: 14630 },
-            { date: '2026-09-25', plant: 'EGMCL 2', section: 'Apparel', utility: 'Electricity', source: 'REB(BEPZA)', unit: 'kWh', kwh: 11200, m3: 0, ltr: 0, kg: 0, cost: 138320 },
-            { date: '2026-09-25', plant: 'PGCL', section: 'Apparel', utility: 'Electricity', source: 'REB(Non BEPZA)', unit: 'kWh', kwh: 13800, m3: 0, ltr: 0, kg: 0, cost: 162840 },
-            { date: '2026-09-25', plant: 'PGCL', section: 'Apparel', utility: 'Steam', source: 'LPG', unit: 'Kg', kwh: 0, m3: 0, ltr: 0, kg: 380, cost: 47500 },
-            { date: '2026-09-26', plant: 'CIPL', section: 'Apparel', utility: 'Electricity', source: 'REB(BEPZA)', unit: 'kWh', kwh: 12900, m3: 0, ltr: 0, kg: 0, cost: 159315 },
-            { date: '2026-09-26', plant: 'CIPL', section: 'Apparel', utility: 'Steam', source: 'NG', unit: 'M3', kwh: 0, m3: 890, ltr: 0, kg: 0, cost: 31862 }
-        ];
-
         /* ==========================================================================
            ACTIVITY LOGGING & CLIENT DIAGNOSTICS (LOGS SHEET INTEGRATION)
            ========================================================================== */
@@ -5195,18 +4381,167 @@
                 location: env.location
             };
 
-            if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.logActivity) {
-                google.script.run.logActivity(logData);
-            } else {
-                console.log('[LOCAL LOG]:', logData);
-            }
+            google.script.run.logActivity(logData);
         }
 
         /* ==========================================================================
            INITIALIZATION & NAVIGATION
            ========================================================================== */
-        window.addEventListener('DOMContentLoaded', () => {
+        /* ==========================================================================
+           SESSION & SIGN-IN GATE
+           ========================================================================== */
+
+        // Plants this session is allowed to open. Populated from /api/session;
+        // the server enforces the same rule, so this only shapes the UI.
+        let authorizedPlants = [];
+        let sessionRole = null;
+
+        function canOpenPlant(plant) {
+            return authorizedPlants.indexOf(plant) !== -1;
+        }
+
+        function showAuthGate(message) {
+            const gate = document.getElementById('authGate');
+            const err = document.getElementById('authError');
+            if (!gate) return;
+            gate.style.display = 'flex';
+            if (message && err) {
+                err.textContent = message;
+                err.style.display = 'block';
+            }
+            const code = document.getElementById('authCode');
+            if (code) { code.value = ''; setTimeout(() => code.focus(), 80); }
             initIcons();
+        }
+
+        function hideAuthGate() {
+            const gate = document.getElementById('authGate');
+            if (gate) gate.style.display = 'none';
+            const err = document.getElementById('authError');
+            if (err) err.style.display = 'none';
+        }
+
+        /** Any 401 from a later call means the 12-hour session lapsed. */
+        function handleAuthExpiry() {
+            authorizedPlants = [];
+            sessionRole = null;
+            document.body.classList.remove('overtime-theme');
+            showAuthGate('Your session has expired. Please sign in again.');
+        }
+
+        async function checkSession() {
+            try {
+                const res = await fetch('/api/session', { credentials: 'same-origin' });
+                if (!res.ok) return null;
+                return await res.json();
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function submitLogin(evt) {
+            evt.preventDefault();
+            const btn = document.getElementById('authSubmit');
+            const txt = document.getElementById('authSubmitText');
+            const err = document.getElementById('authError');
+            const plant = document.getElementById('authPlant').value;
+            const code = document.getElementById('authCode').value;
+
+            btn.disabled = true;
+            if (txt) txt.textContent = 'Verifying...';
+            if (err) err.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plant, code })
+                });
+                const data = await res.json().catch(() => ({}));
+
+                if (!res.ok) {
+                    if (err) {
+                        err.textContent = data.error || 'Sign-in failed. Please try again.';
+                        err.style.display = 'block';
+                    }
+                    document.getElementById('authCode').value = '';
+                    return;
+                }
+
+                authorizedPlants = data.plants || [];
+                sessionRole = data.role || null;
+                hideAuthGate();
+                startApp();
+            } catch (e) {
+                if (err) {
+                    err.textContent = 'Could not reach the server. Check your connection and try again.';
+                    err.style.display = 'block';
+                }
+            } finally {
+                btn.disabled = false;
+                if (txt) txt.textContent = 'Open Register';
+                initIcons();
+            }
+        }
+
+        async function signOut() {
+            // Drop the open-plant timer first: goHome() would otherwise fire a
+            // "Plant Closed" log against a session we are about to end, and the
+            // resulting 401 would replace the sign-out message with an
+            // "expired" one.
+            plantOpenedTimestamp = null;
+            activePlant = null;
+
+            try {
+                await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+            } catch (e) { /* sign out locally regardless */ }
+
+            authorizedPlants = [];
+            sessionRole = null;
+            document.body.classList.remove('overtime-theme');
+            goHome(false);
+            showAuthGate('You have been signed out.');
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            initIcons();
+            document.getElementById('authForm').addEventListener('submit', submitLogin);
+
+            const session = await checkSession();
+            if (!session) {
+                showAuthGate();
+                return;
+            }
+            authorizedPlants = session.plants || [];
+            sessionRole = session.role || null;
+            hideAuthGate();
+            startApp();
+        });
+
+        /** Show only the footer controls this session is actually allowed to use. */
+        function applySessionToFooter() {
+            const isAdmin = sessionRole === 'admin';
+            const show = (id, on) => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = on ? '' : 'none';
+            };
+            show('footerExportCsv', isAdmin);
+            show('footerDiagnostics', isAdmin);
+            show('footerSignOut', true);
+
+            const label = document.getElementById('footerSessionLabel');
+            if (label) {
+                label.textContent = isAdmin
+                    ? 'Signed in as Central Engineering Admin'
+                    : `Signed in as ${authorizedPlants[0] || 'Facility'}`;
+            }
+            initIcons();
+        }
+
+        /** Everything that used to run on DOMContentLoaded, now gated on a session. */
+        function startApp() {
+            applySessionToFooter();
 
             // Set default date to today
             const today = new Date().toISOString().split('T')[0];
@@ -5227,7 +4562,7 @@
                 const parts = initialHash.split('?');
                 const plantName = decodeURIComponent(parts[0]);
                 const isOT = parts[1] && parts[1].includes('ot=1');
-                if (configData[plantName] || plantDescriptions[plantName]) {
+                if (canOpenPlant(plantName)) {
                     openPlant(plantName, !!isOT, false);
                     history.replaceState({ view: 'facility', plant: plantName, isOT: !!isOT }, '', window.location.hash);
                 } else {
@@ -5250,7 +4585,7 @@
                         const parts = rawHash.split('?');
                         const plantName = decodeURIComponent(parts[0]);
                         const isOT = parts[1] && parts[1].includes('ot=1');
-                        if (configData[plantName] || plantDescriptions[plantName]) {
+                        if (canOpenPlant(plantName)) {
                             openPlant(plantName, !!isOT, false);
                             return;
                         }
@@ -5258,7 +4593,7 @@
                     goHome(false);
                 }
             });
-        });
+        }
 
         function initIcons() {
             if (window.lucide) {
@@ -5272,30 +4607,6 @@
             if (mainApp) mainApp.style.display = 'block';
             initIcons();
         }
-
-        function switchDashMode(mode) {
-            currentDashMode = mode;
-            const actBtn = document.getElementById('modeActualBtn');
-            const budBtn = document.getElementById('modeBudgetBtn');
-            const actSec = document.getElementById('dashActualSection');
-            const budSec = document.getElementById('dashBudgetSection');
-
-            if (mode === 'actual') {
-                actBtn.classList.add('active');
-                budBtn.classList.remove('active');
-                actSec.style.display = 'block';
-                budSec.style.display = 'none';
-                updateDashboard();
-            } else {
-                budBtn.classList.add('active');
-                actBtn.classList.remove('active');
-                actSec.style.display = 'none';
-                budSec.style.display = 'block';
-                updateBudgetDashboard();
-            }
-            initIcons();
-        }
-
         /* ==========================================================================
            DATA ENTRY WORKFLOW
            ========================================================================== */
@@ -5315,7 +4626,9 @@
             if (!grid) return;
             grid.innerHTML = '';
 
-            const plants = Object.keys(configData);
+            // Only facilities this session's access code covers. An admin
+            // session lists all of them; a plant code lists exactly one.
+            const plants = Object.keys(configData).filter(canOpenPlant);
             plants.forEach(plant => {
                 const desc = plantDescriptions[plant] || {
                     fullName: 'Manufacturing Plant',
@@ -5378,6 +4691,14 @@
         }
 
         function openPlant(plant, isOT = false, pushHistory = true) {
+            // A hand-typed hash must not reach another facility's register.
+            // The server rejects it too; this keeps the UI honest about it.
+            if (!canOpenPlant(plant)) {
+                goHome(false);
+                showStatus(`Your access code does not cover ${plant}.`, 'error');
+                return;
+            }
+
             activePlant = plant;
             plantOpenedTimestamp = Date.now();
 
@@ -5441,55 +4762,29 @@
             // Log Plant Opened to Logs sheet
             logClientAction('Plant Opened', `Utility register opened for ${plant}`, { plant: plant, date: selectedDate });
 
-            if (typeof google !== 'undefined' && google.script && google.script.run) {
-                google.script.run
-                    .withSuccessHandler((data) => {
-                        if (data && data.lastReadings) {
-                            previousReadings = data.lastReadings;
-                            existingDailyReadings = data.existingDailyReadings || {};
-                        } else {
-                            previousReadings = data || {};
-                            existingDailyReadings = {};
-                        }
-                        renderTable();
-                        hideLoading();
-                        const icon = document.getElementById('syncReadingsIcon');
-                        if (icon) icon.classList.remove('spinner');
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                    })
-                    .withFailureHandler(err => {
-                        hideLoading();
-                        const icon = document.getElementById('syncReadingsIcon');
-                        if (icon) icon.classList.remove('spinner');
-                        showStatus(`Load error: ${err.message || err}`, "error");
-                        goHome();
-                    })
-                    .fetchAllPreviousReadings(plant, isOT, selectedDate);
-            } else {
-                // Standalone local mock previous readings + localStorage saved daily entries
-                setTimeout(() => {
-                    const storageKey = `epic_saved_readings_${plant}_${isOT ? 'ot' : 'norm'}_${selectedDate}`;
-                    let localSaved = {};
-                    try {
-                        localSaved = JSON.parse(localStorage.getItem(storageKey) || '{}');
-                    } catch (e) { }
-
-                    previousReadings = {};
-                    existingDailyReadings = localSaved;
-
-                    currentRowsConfig.forEach(row => {
-                        const key = row.section + "_" + row.utility + "_" + row.source;
-                        if (!previousReadings[key]) {
-                            previousReadings[key] = (12000 + (row.cost * 120)).toFixed(0);
-                        }
-                    });
-
+            google.script.run
+                .withSuccessHandler((data) => {
+                    if (data && data.lastReadings) {
+                        previousReadings = data.lastReadings;
+                        existingDailyReadings = data.existingDailyReadings || {};
+                    } else {
+                        previousReadings = data || {};
+                        existingDailyReadings = {};
+                    }
                     renderTable();
                     hideLoading();
                     const icon = document.getElementById('syncReadingsIcon');
                     if (icon) icon.classList.remove('spinner');
-                }, 250);
-            }
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                })
+                .withFailureHandler(err => {
+                    hideLoading();
+                    const icon = document.getElementById('syncReadingsIcon');
+                    if (icon) icon.classList.remove('spinner');
+                    showStatus(`Load error: ${err.message || err}`, "error");
+                    goHome();
+                })
+                .fetchAllPreviousReadings(plant, isOT, selectedDate);
         }
 
         function goHome(pushHistory = true) {
@@ -5683,18 +4978,18 @@
                             <i data-lucide="${isLocked ? 'lock' : 'check'}"></i>
                             <span>${prev !== "-" ? Number(prev).toLocaleString('en-US') : '-'}</span>
                         </span>
-                        ${(!isLocked && prev !== "-") ? `<button type="button" class="mini-copy" onclick="copyPrevVal(${index}, '${prev}')" title="Copy previous reading to present">Copy</button>` : ''}
+                        ${(!isLocked && prev !== "-") ? `<button type="button" class="mini-copy" onclick="copyPrevVal(${index})" title="Copy previous reading to present">Copy</button>` : ''}
                     </td>
                     <td class="text-right">
                         ${isLocked ? `
                             <input type="number"
                                 class="reading-input pres-reading input-locked"
                                 id="pres_${index}"
-                                value="${presVal}"
+                                value="${escapeHtml(presVal)}"
                                 disabled
                                 data-index="${index}"
                                 data-cost="${row.cost}"
-                                data-prev="${prev !== '-' ? prev : 0}"
+                                data-prev="${Number(prev) || 0}"
                                 data-locked="true">
                             <div style="display:flex; justify-content:flex-end; margin-top:3px;">
                                 <span class="locked-tag"><i data-lucide="check-circle" style="width:10px;height:10px;"></i> Recorded for Date</span>
@@ -5705,7 +5000,7 @@
                                 id="pres_${index}"
                                 data-index="${index}"
                                 data-cost="${row.cost}"
-                                data-prev="${prev !== '-' ? prev : 0}"
+                                data-prev="${Number(prev) || 0}"
                                 placeholder="0.00"
                                 oninput="onReadingInput(${index})">
                             <div style="display:flex; justify-content:flex-end; margin-top:2px;">
@@ -5735,7 +5030,7 @@
                                 <input type="text"
                                     class="ot-row-remark"
                                     id="ot_remark_${index}"
-                                    value="${rowRemark}"
+                                    value="${escapeHtml(rowRemark)}"
                                     disabled
                                     style="color:#64748B;">
                             </div>
@@ -5823,7 +5118,7 @@
                                     </div>
                                 </div>
                                 ${(!isLocked && prev !== "-") ? `
-                                    <button type="button" class="m-btn-copy" onclick="copyPrevVal(${index}, '${prev}')" title="Copy to present reading">
+                                    <button type="button" class="m-btn-copy" onclick="copyPrevVal(${index})" title="Copy to present reading">
                                         <i data-lucide="copy" style="width:11px;height:11px;"></i>
                                         <span>Copy</span>
                                     </button>
@@ -5842,7 +5137,7 @@
                                         step="any"
                                         class="m-pres-input" 
                                         id="m_pres_${index}" 
-                                        value="${presVal}"
+                                        value="${escapeHtml(presVal)}"
                                         ${isLocked ? 'disabled' : ''}
                                         placeholder="0.00"
                                         oninput="onMobileReadingInput(${index})">
@@ -5880,7 +5175,7 @@
                                 <div class="m-ot-inner">
                                     <input type="text"
                                         id="m_ot_remark_${index}"
-                                        value="${rowRemark}"
+                                        value="${escapeHtml(rowRemark)}"
                                         ${isLocked ? 'disabled' : ''}
                                         placeholder="Specific line or machine justification..."
                                         oninput="syncMobileRemark(${index})">
@@ -5910,10 +5205,13 @@
             initIcons();
         }
 
-        function copyPrevVal(index, val) {
+        function copyPrevVal(index) {
             const input = document.getElementById(`pres_${index}`);
             const mInput = document.getElementById(`m_pres_${index}`);
             if (input && !input.disabled) {
+                // Sourced from data-prev rather than an inline string argument,
+                // so a sheet value can never break out into the onclick handler.
+                const val = input.dataset.prev || '';
                 input.value = val;
                 if (mInput) mInput.value = val;
                 onReadingInput(index);
@@ -6176,56 +5474,23 @@
                 remarks: remarks
             };
 
-            if (typeof google !== 'undefined' && google.script && google.script.run) {
-                google.script.run
-                    .withSuccessHandler((msg) => {
-                        hideLoading();
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = `<i data-lucide="save"></i><span>Save Utility Data</span>`;
-                        initIcons();
-                        clearCurrentDraft();
-                        showSubmissionModal(records.length, date, activePlant, durationSec, submitTotalCost);
-                    })
-                    .withFailureHandler(err => {
-                        hideLoading();
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = `<i data-lucide="save"></i><span>Save Utility Data</span>`;
-                        initIcons();
-                        showStatus("Submission Error: " + (err.message || err), "error");
-                    })
-                    .submitBulkData(payload, clientInfo);
-            } else {
-                // Standalone mock submission with localStorage persistence
-                setTimeout(() => {
-                    const storageKey = `epic_saved_readings_${activePlant}_${isOvertime ? 'ot' : 'norm'}_${date}`;
-                    let localSaved = {};
-                    try {
-                        localSaved = JSON.parse(localStorage.getItem(storageKey) || '{}');
-                    } catch (e) { }
-
-                    records.forEach(r => {
-                        const k = r.section + "_" + r.utility + "_" + r.source;
-                        const prevNum = parseFloat(r.prev) || 0;
-                        const presNum = parseFloat(r.pres) || 0;
-                        localSaved[k] = {
-                            submitted: true,
-                            pres: presNum,
-                            prev: prevNum,
-                            diff: presNum - prevNum,
-                            cost: (presNum - prevNum) * (parseFloat(r.cost) || 0),
-                            remarks: r.remarks || ''
-                        };
-                    });
-                    localStorage.setItem(storageKey, JSON.stringify(localSaved));
-
+            google.script.run
+                .withSuccessHandler((msg) => {
                     hideLoading();
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = `<i data-lucide="save"></i><span>Save Utility Data</span>`;
                     initIcons();
                     clearCurrentDraft();
                     showSubmissionModal(records.length, date, activePlant, durationSec, submitTotalCost);
-                }, 600);
-            }
+                })
+                .withFailureHandler(err => {
+                    hideLoading();
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `<i data-lucide="save"></i><span>Save Utility Data</span>`;
+                    initIcons();
+                    showStatus("Submission Error: " + (err.message || err), "error");
+                })
+                .submitBulkData(payload, clientInfo);
         }
 
         function showSubmissionModal(recordCount, date, plant, duration, totalEstCost = 0) {
@@ -6269,8 +5534,17 @@
             const date = document.getElementById("entryDate") ? document.getElementById("entryDate").value : new Date().toISOString().split('T')[0];
             const isOT = document.getElementById("isOvertime") ? document.getElementById("isOvertime").checked : false;
 
+            // Offer only facilities this session covers. Submitting for another
+            // plant would be rejected server-side with a 403, so do not present
+            // it as a choice.
             const plantSelect = document.getElementById("adminModalPlant");
-            if (plantSelect) plantSelect.value = activePlant || 'EGMCL 1';
+            if (plantSelect) {
+                Array.from(plantSelect.options).forEach(opt => {
+                    opt.hidden = !canOpenPlant(opt.value);
+                    opt.disabled = opt.hidden;
+                });
+                plantSelect.value = canOpenPlant(activePlant) ? activePlant : (authorizedPlants[0] || '');
+            }
 
             const shiftSelect = document.getElementById("adminModalShift");
             if (shiftSelect) shiftSelect.value = isOT ? 'Overtime' : 'Regular';
@@ -6387,775 +5661,11 @@
                 alert("Error recording adjustment request: " + (err.message || err));
             };
 
-            if (typeof google !== 'undefined' && google.script && google.script.run) {
-                google.script.run
-                    .withSuccessHandler(handleSuccess)
-                    .withFailureHandler(handleFailure)
-                    .submitAdjustmentRequest(payload);
-            } else {
-                fetch('/api/adjustment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.success) {
-                            handleSuccess(data);
-                        } else {
-                            handleFailure(data);
-                        }
-                    })
-                    .catch(() => {
-                        const fallbackId = 'REQ-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(1000 + Math.random() * 9000);
-                        handleSuccess({
-                            success: true,
-                            requestId: fallbackId,
-                            message: `Adjustment request [${fallbackId}] logged to "Adjustment/Correction Record". Central Admin has been notified.`
-                        });
-                    });
-            }
+            google.script.run
+                .withSuccessHandler(handleSuccess)
+                .withFailureHandler(handleFailure)
+                .submitAdjustmentRequest(payload);
         }
-
-        /* ==========================================================================
-           DATA DASHBOARD - ACTUAL CONSUMPTION LOGIC (Tab-wise from Plant Sheets)
-           ========================================================================== */
-        function selectDashPlantTab(plant, btnElement) {
-            const tabs = document.querySelectorAll('#actualPlantSubTabs .plant-subtab');
-            tabs.forEach(t => t.classList.remove('active'));
-            if (btnElement) btnElement.classList.add('active');
-
-            // Sync with dropdown filter
-            const select = document.getElementById('dashPlant');
-            if (select) select.value = plant;
-
-            updateDashboard();
-        }
-
-        function syncPlantDropdownToTabs() {
-            const selectVal = document.getElementById('dashPlant').value;
-            const tabs = document.querySelectorAll('#actualPlantSubTabs .plant-subtab');
-            tabs.forEach(t => {
-                if (t.textContent.includes(selectVal) || (selectVal === 'All' && t.textContent.includes('All'))) {
-                    t.classList.add('active');
-                } else {
-                    t.classList.remove('active');
-                }
-            });
-        }
-
-        function fetchDashboardData(isManual = false) {
-            const spinner = document.getElementById('dashSyncSpinner');
-            if (spinner) spinner.classList.add('spinner');
-
-            if (typeof google !== 'undefined' && google.script && google.script.run) {
-                google.script.run
-                    .withSuccessHandler((data) => {
-                        if (spinner) spinner.classList.remove('spinner');
-                        dashboardData = (data && data.records) ? data.records : [];
-                        budgetRecordsData = (data && data.budgetRecords) ? data.budgetRecords : defaultBudgetRecords;
-                        updateDashboard();
-                        updateBudgetDashboard();
-                    })
-                    .withFailureHandler(err => {
-                        if (spinner) spinner.classList.remove('spinner');
-                        console.error('Failed to load dashboard data:', err);
-                        dashboardData = defaultSampleActual;
-                        budgetRecordsData = defaultBudgetRecords;
-                        updateDashboard();
-                        updateBudgetDashboard();
-                    })
-                    .getDashboardData();
-            } else {
-                setTimeout(() => {
-                    if (spinner) spinner.classList.remove('spinner');
-                    dashboardData = defaultSampleActual;
-                    budgetRecordsData = defaultBudgetRecords;
-                    updateDashboard();
-                    updateBudgetDashboard();
-                }, 400);
-            }
-        }
-
-        function applyPresetDate() {
-            const preset = document.getElementById("dashPreset").value;
-            const startInput = document.getElementById("dashStart");
-            const endInput = document.getElementById("dashEnd");
-            const now = new Date();
-
-            if (preset === "all") {
-                startInput.value = "";
-                endInput.value = "";
-            } else if (preset === "today") {
-                const s = now.toISOString().split('T')[0];
-                startInput.value = s;
-                endInput.value = s;
-            } else if (preset === "last7") {
-                endInput.value = now.toISOString().split('T')[0];
-                const d = new Date();
-                d.setDate(d.getDate() - 7);
-                startInput.value = d.toISOString().split('T')[0];
-            } else if (preset === "last30") {
-                endInput.value = now.toISOString().split('T')[0];
-                const d = new Date();
-                d.setDate(d.getDate() - 30);
-                startInput.value = d.toISOString().split('T')[0];
-            } else if (preset === "thisMonth") {
-                const y = now.getFullYear();
-                const m = String(now.getMonth() + 1).padStart(2, '0');
-                startInput.value = `${y}-${m}-01`;
-                endInput.value = now.toISOString().split('T')[0];
-            } else if (preset === "lastMonth") {
-                const y = now.getFullYear();
-                const m = now.getMonth();
-                const firstDay = new Date(y, m - 1, 1);
-                const lastDay = new Date(y, m, 0);
-                startInput.value = firstDay.toISOString().split('T')[0];
-                endInput.value = lastDay.toISOString().split('T')[0];
-            } else if (preset === "thisYear") {
-                const y = now.getFullYear();
-                startInput.value = `${y}-01-01`;
-                endInput.value = now.toISOString().split('T')[0];
-            }
-            updateDashboard();
-        }
-
-        function setCustomPreset() {
-            document.getElementById("dashPreset").value = "custom";
-        }
-
-        function resetDashFilters() {
-            document.getElementById("dashPreset").value = "all";
-            document.getElementById("dashStart").value = "";
-            document.getElementById("dashEnd").value = "";
-            document.getElementById("dashPlant").value = "All";
-            document.getElementById("dashUtility").value = "All";
-            syncPlantDropdownToTabs();
-            updateDashboard();
-        }
-
-        function updateDashboard() {
-            const startVal = document.getElementById("dashStart").value;
-            const endVal = document.getElementById("dashEnd").value;
-            const plantVal = document.getElementById("dashPlant").value;
-            const utilVal = document.getElementById("dashUtility").value;
-
-            // Filter actual consumption records
-            filteredDashData = dashboardData.filter(item => {
-                if (startVal && item.date < startVal) return false;
-                if (endVal && item.date > endVal) return false;
-                if (plantVal !== "All" && item.plant !== plantVal) return false;
-                if (utilVal !== "All" && item.utility !== utilVal) return false;
-                return true;
-            });
-
-            // Update titles based on plant selection
-            const trendTitle = document.getElementById('trendChartTitle');
-            const plantTitle = document.getElementById('plantChartTitle');
-            if (plantVal !== 'All') {
-                trendTitle.textContent = `${plantVal} Actual Utility Cost Trend (BDT)`;
-                plantTitle.textContent = `${plantVal} Cost by Utility Equipment`;
-            } else {
-                trendTitle.textContent = `Actual Utility Cost Trend (BDT) - All Facilities`;
-                plantTitle.textContent = `Cost Breakdown by Facility`;
-            }
-
-            calculateKPIs(filteredDashData);
-            renderCharts(filteredDashData, plantVal);
-            renderTableData(filteredDashData);
-        }
-
-        function calculateKPIs(data) {
-            let totalCost = 0;
-            let totalKwh = 0;
-            let totalM3 = 0;
-            let totalLtr = 0;
-            let totalWater = 0;
-            let totalKg = 0;
-
-            data.forEach(d => {
-                totalCost += (Number(d.cost) || 0);
-                totalKwh += (Number(d.kwh) || 0);
-                totalM3 += (Number(d.m3) || 0);
-                totalLtr += (Number(d.ltr) || 0);
-                totalKg += (Number(d.kg) || 0);
-
-                if (d.utility === 'Water' || (d.unit === 'M3' && d.utility !== 'Steam' && d.utility !== 'Oven')) {
-                    totalWater += (Number(d.m3) || 0);
-                }
-            });
-
-            const usdRate = 123;
-            const totalUsd = totalCost / usdRate;
-
-            document.getElementById("kpiCost").textContent = formatCurrency(totalCost);
-            document.getElementById("kpiCostUsd").textContent = `≈ $${formatNumber(totalUsd)} USD (Rate: 123)`;
-            document.getElementById("kpiKwh").textContent = formatNumber(totalKwh);
-            document.getElementById("kpiM3").textContent = formatNumber(totalM3);
-            document.getElementById("kpiLtr").textContent = formatNumber(totalLtr);
-            document.getElementById("kpiWater").textContent = formatNumber(totalWater);
-            document.getElementById("kpiKg").textContent = formatNumber(totalKg);
-        }
-
-        function formatCurrency(val) {
-            if (val >= 10000000) return '৳ ' + (val / 10000000).toFixed(2) + ' Cr';
-            if (val >= 100000) return '৳ ' + (val / 100000).toFixed(2) + ' L';
-            return '৳ ' + Math.round(val).toLocaleString('en-US');
-        }
-
-        function formatNumber(val) {
-            if (val >= 1000000) return (val / 1000000).toFixed(2) + 'M';
-            if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
-            return Math.round(val).toLocaleString('en-US');
-        }
-
-        function renderCharts(data, selectedPlant) {
-            // 1. Cost Trend Line Chart
-            const dateMap = {};
-            data.forEach(d => {
-                if (!d.date) return;
-                dateMap[d.date] = (dateMap[d.date] || 0) + (Number(d.cost) || 0);
-            });
-            const sortedDates = Object.keys(dateMap).sort();
-            const trendCosts = sortedDates.map(dt => dateMap[dt]);
-
-            if (trendChartInstance) trendChartInstance.destroy();
-            const trendCtx = document.getElementById("trendChart").getContext("2d");
-            trendChartInstance = new Chart(trendCtx, {
-                type: 'line',
-                data: {
-                    labels: sortedDates,
-                    datasets: [{
-                        label: 'Cost (BDT)',
-                        data: trendCosts,
-                        borderColor: EPIC_COLORS.blue,
-                        backgroundColor: 'rgba(0, 48, 135, 0.08)',
-                        fill: true,
-                        tension: 0.25,
-                        pointBackgroundColor: EPIC_COLORS.blue,
-                        pointRadius: sortedDates.length > 25 ? 0 : 3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => ` Cost: ৳ ${Number(ctx.raw).toLocaleString('en-US')}`
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: '#F1F5F9' },
-                            ticks: { callback: v => '৳ ' + formatNumber(v) }
-                        },
-                        x: {
-                            grid: { display: false }
-                        }
-                    }
-                }
-            });
-
-            // 2. Utility Category Doughnut Chart
-            const utilMap = {};
-            data.forEach(d => {
-                const u = d.utility || 'Other';
-                utilMap[u] = (utilMap[u] || 0) + (Number(d.cost) || 0);
-            });
-            const utilLabels = Object.keys(utilMap);
-            const utilCosts = utilLabels.map(u => utilMap[u]);
-
-            if (utilityChartInstance) utilityChartInstance.destroy();
-            const utilCtx = document.getElementById("utilityChart").getContext("2d");
-            utilityChartInstance = new Chart(utilCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: utilLabels,
-                    datasets: [{
-                        data: utilCosts,
-                        backgroundColor: EPIC_COLORS.palette,
-                        borderWidth: 2,
-                        borderColor: '#FFFFFF'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => ` ${ctx.label}: ৳ ${Number(ctx.raw).toLocaleString('en-US')}`
-                            }
-                        }
-                    },
-                    cutout: '62%'
-                }
-            });
-
-            // 3. Plant Breakdown / Equipment Breakdown Bar Chart
-            if (plantChartInstance) plantChartInstance.destroy();
-            const plantCtx = document.getElementById("plantChart").getContext("2d");
-
-            if (selectedPlant === 'All') {
-                // Bar breakdown across plants
-                const plantMap = {};
-                data.forEach(d => {
-                    const p = d.plant || 'Unknown';
-                    plantMap[p] = (plantMap[p] || 0) + (Number(d.cost) || 0);
-                });
-                const plantLabels = Object.keys(plantMap);
-                const plantCosts = plantLabels.map(p => plantMap[p]);
-
-                plantChartInstance = new Chart(plantCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: plantLabels,
-                        datasets: [{
-                            label: 'Cost (BDT)',
-                            data: plantCosts,
-                            backgroundColor: EPIC_COLORS.blue,
-                            borderRadius: 6
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { callback: v => '৳ ' + formatNumber(v) } },
-                            x: { grid: { display: false } }
-                        }
-                    }
-                });
-            } else {
-                // Bar breakdown across equipments/sections of that specific plant
-                const secMap = {};
-                data.forEach(d => {
-                    const s = (d.equip || d.source || d.section || 'General');
-                    secMap[s] = (secMap[s] || 0) + (Number(d.cost) || 0);
-                });
-                const secLabels = Object.keys(secMap);
-                const secCosts = secLabels.map(s => secMap[s]);
-
-                plantChartInstance = new Chart(plantCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: secLabels,
-                        datasets: [{
-                            label: 'Cost (BDT)',
-                            data: secCosts,
-                            backgroundColor: EPIC_COLORS.sky,
-                            borderRadius: 6
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { callback: v => '৳ ' + formatNumber(v) } },
-                            x: { grid: { display: false } }
-                        }
-                    }
-                });
-            }
-
-            // 4. Source Breakdown Bar Chart
-            const srcMap = {};
-            data.forEach(d => {
-                const s = d.source || 'Other';
-                srcMap[s] = (srcMap[s] || 0) + (Number(d.cost) || 0);
-            });
-            const srcLabels = Object.keys(srcMap);
-            const srcCosts = srcLabels.map(s => srcMap[s]);
-
-            if (sourceChartInstance) sourceChartInstance.destroy();
-            const srcCtx = document.getElementById("sourceChart").getContext("2d");
-            sourceChartInstance = new Chart(srcCtx, {
-                type: 'bar',
-                data: {
-                    labels: srcLabels,
-                    datasets: [{
-                        label: 'Cost (BDT)',
-                        data: srcCosts,
-                        backgroundColor: EPIC_COLORS.teal,
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { callback: v => '৳ ' + formatNumber(v) } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-        }
-
-        function renderTableData(data) {
-            const tbody = document.getElementById("dashTableBody");
-            const countBadge = document.getElementById("dashRecordCount");
-            const searchVal = (document.getElementById("dashTableSearchInput").value || "").toLowerCase().trim();
-
-            let displayed = data;
-            if (searchVal) {
-                displayed = data.filter(r => {
-                    return (r.plant && r.plant.toLowerCase().includes(searchVal)) ||
-                        (r.section && r.section.toLowerCase().includes(searchVal)) ||
-                        (r.utility && r.utility.toLowerCase().includes(searchVal)) ||
-                        (r.source && r.source.toLowerCase().includes(searchVal)) ||
-                        (r.date && r.date.toLowerCase().includes(searchVal));
-                });
-            }
-
-            countBadge.textContent = `${displayed.length} Records`;
-
-            if (displayed.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">No records found matching criteria</td></tr>`;
-                return;
-            }
-
-            // Limit table display to first 250 records for responsive performance
-            const pageData = displayed.slice(0, 250);
-            tbody.innerHTML = pageData.map(row => {
-                const costVal = Number(row.cost) || 0;
-                return `
-                    <tr>
-                        <td><strong>${row.date || '-'}</strong></td>
-                        <td><span class="badge-plant-pill">${row.plant}</span></td>
-                        <td>${row.section || '-'}</td>
-                        <td>${row.utility || '-'}</td>
-                        <td>${row.source || '-'}</td>
-                        <td><span class="unit-badge">${row.unit || '-'}</span></td>
-                        <td class="text-right cost-text">৳ ${costVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function onDashTableSearch() {
-            renderTableData(filteredDashData);
-        }
-
-        function exportDashRecordsCSV() {
-            if (!filteredDashData || filteredDashData.length === 0) {
-                alert("No records available to export.");
-                return;
-            }
-
-            const headers = ["Date", "Plant", "Section", "Utility", "Source", "Unit", "kWh", "M3", "Ltr", "Kg", "Cost_BDT"];
-            const csvRows = [headers.join(",")];
-
-            filteredDashData.forEach(row => {
-                const values = [
-                    row.date || '',
-                    `"${row.plant || ''}"`,
-                    `"${row.section || ''}"`,
-                    `"${row.utility || ''}"`,
-                    `"${row.source || ''}"`,
-                    `"${row.unit || ''}"`,
-                    row.kwh || 0,
-                    row.m3 || 0,
-                    row.ltr || 0,
-                    row.kg || 0,
-                    row.cost || 0
-                ];
-                csvRows.push(values.join(","));
-            });
-
-            const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `EPIC_Utility_Records_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        /* ==========================================================================
-           DATA DASHBOARD - ALLOCATED BUDGET LOGIC (01_Records)
-           ========================================================================== */
-        const BUDGET_MONTHS = ['Jul-26', 'Aug-26', 'Sep-26', 'Oct-26', 'Nov-26', 'Dec-26', 'Jan-27', 'Feb-27', 'Mar-27', 'Apr-27', 'May-27', 'Jun-27'];
-
-        function selectBudgetPlantTab(plant, btnElement) {
-            const tabs = document.querySelectorAll('#budgetPlantSubTabs .plant-subtab');
-            tabs.forEach(t => t.classList.remove('active'));
-            if (btnElement) btnElement.classList.add('active');
-
-            const sel = document.getElementById('budgetPlantSelect');
-            if (sel) sel.value = plant;
-
-            updateBudgetDashboard();
-        }
-
-        function syncBudgetPlantDropdown() {
-            const val = document.getElementById('budgetPlantSelect').value;
-            const tabs = document.querySelectorAll('#budgetPlantSubTabs .plant-subtab');
-            tabs.forEach(t => {
-                if (t.textContent.includes(val) || (val === 'All' && t.textContent.includes('All'))) {
-                    t.classList.add('active');
-                } else {
-                    t.classList.remove('active');
-                }
-            });
-        }
-
-        function resetBudgetFilters() {
-            document.getElementById('budgetPlantSelect').value = 'All';
-            document.getElementById('budgetUtilitySelect').value = 'All';
-            document.getElementById('budgetMonthSelect').value = 'All';
-            syncBudgetPlantDropdown();
-            updateBudgetDashboard();
-        }
-
-        function updateBudgetDashboard() {
-            const plantVal = document.getElementById('budgetPlantSelect').value;
-            const utilVal = document.getElementById('budgetUtilitySelect').value;
-            const monthVal = document.getElementById('budgetMonthSelect').value;
-
-            filteredBudgetData = budgetRecordsData.filter(row => {
-                if (plantVal !== 'All' && row.plant !== plantVal) return false;
-                if (utilVal !== 'All' && row.utility !== utilVal) return false;
-                return true;
-            });
-
-            calculateBudgetKPIs(filteredBudgetData, monthVal);
-            renderBudgetCharts(filteredBudgetData, monthVal);
-            renderBudgetTable(filteredBudgetData);
-        }
-
-        function calculateBudgetKPIs(data, activeMonth) {
-            let totalBudget = 0;
-            let elecBudget = 0;
-            let steamBudget = 0;
-            let waterBudget = 0;
-
-            data.forEach(d => {
-                let amount = 0;
-                if (activeMonth === 'All') {
-                    amount = Number(d.total) || 0;
-                } else {
-                    amount = (d.months && d.months[activeMonth]) ? Number(d.months[activeMonth]) : 0;
-                }
-
-                totalBudget += amount;
-                if (d.utility === 'Electricity') elecBudget += amount;
-                else if (d.utility === 'Steam' || d.utility === 'Oven') steamBudget += amount;
-                else if (d.utility === 'Water' || d.utility === 'Waste Water BEPZA' || d.utility === 'ETP Chemical') waterBudget += amount;
-            });
-
-            document.getElementById('kpiBudgetTotal').textContent = formatCurrency(totalBudget);
-            document.getElementById('kpiBudgetElec').textContent = formatCurrency(elecBudget);
-            document.getElementById('kpiBudgetSteam').textContent = formatCurrency(steamBudget);
-            document.getElementById('kpiBudgetWater').textContent = formatCurrency(waterBudget);
-
-            const subLabel = activeMonth === 'All' ? 'Annual Budget Allocation' : `${activeMonth} Allocation`;
-            document.getElementById('kpiBudgetTotalSub').textContent = subLabel;
-            document.getElementById('kpiBudgetElecSub').textContent = `${((elecBudget / (totalBudget || 1)) * 100).toFixed(1)}% of budget`;
-            document.getElementById('kpiBudgetSteamSub').textContent = `${((steamBudget / (totalBudget || 1)) * 100).toFixed(1)}% of budget`;
-            document.getElementById('kpiBudgetWaterSub').textContent = `${((waterBudget / (totalBudget || 1)) * 100).toFixed(1)}% of budget`;
-        }
-
-        function renderBudgetCharts(data, activeMonth) {
-            // 1. Monthly Budget Allocation Trend (Bar Chart across 12 months)
-            const monthTotals = {};
-            BUDGET_MONTHS.forEach(m => monthTotals[m] = 0);
-
-            data.forEach(d => {
-                BUDGET_MONTHS.forEach(m => {
-                    monthTotals[m] += (d.months && d.months[m]) ? Number(d.months[m]) : 0;
-                });
-            });
-
-            if (budgetTrendChartInstance) budgetTrendChartInstance.destroy();
-            const trendCtx = document.getElementById('budgetTrendChart').getContext('2d');
-            budgetTrendChartInstance = new Chart(trendCtx, {
-                type: 'bar',
-                data: {
-                    labels: BUDGET_MONTHS,
-                    datasets: [{
-                        label: 'Allocated Budget',
-                        data: BUDGET_MONTHS.map(m => monthTotals[m]),
-                        backgroundColor: BUDGET_MONTHS.map(m => (activeMonth === m ? EPIC_COLORS.amber : EPIC_COLORS.blue)),
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => ` Budget: ৳ ${Number(ctx.raw).toLocaleString('en-US')}`
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { callback: v => '৳ ' + formatNumber(v) } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-
-            // 2. Budget Share by Utility Category Doughnut
-            const utilMap = {};
-            data.forEach(d => {
-                const u = d.utility || 'Other';
-                let amt = activeMonth === 'All' ? Number(d.total) || 0 : ((d.months && d.months[activeMonth]) ? Number(d.months[activeMonth]) : 0);
-                utilMap[u] = (utilMap[u] || 0) + amt;
-            });
-            const utilLabels = Object.keys(utilMap);
-            const utilCosts = utilLabels.map(u => utilMap[u]);
-
-            if (budgetCategoryChartInstance) budgetCategoryChartInstance.destroy();
-            const catCtx = document.getElementById('budgetCategoryChart').getContext('2d');
-            budgetCategoryChartInstance = new Chart(catCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: utilLabels,
-                    datasets: [{
-                        data: utilCosts,
-                        backgroundColor: EPIC_COLORS.palette,
-                        borderWidth: 2,
-                        borderColor: '#FFFFFF'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => ` ${ctx.label}: ৳ ${Number(ctx.raw).toLocaleString('en-US')}`
-                            }
-                        }
-                    },
-                    cutout: '62%'
-                }
-            });
-
-            // 3. Budget by Facility Comparison Bar
-            const plantMap = {};
-            data.forEach(d => {
-                const p = d.plant || 'Unknown';
-                let amt = activeMonth === 'All' ? Number(d.total) || 0 : ((d.months && d.months[activeMonth]) ? Number(d.months[activeMonth]) : 0);
-                plantMap[p] = (plantMap[p] || 0) + amt;
-            });
-            const plantLabels = Object.keys(plantMap);
-            const plantCosts = plantLabels.map(p => plantMap[p]);
-
-            if (budgetPlantChartInstance) budgetPlantChartInstance.destroy();
-            const plantCtx = document.getElementById('budgetPlantChart').getContext('2d');
-            budgetPlantChartInstance = new Chart(plantCtx, {
-                type: 'bar',
-                data: {
-                    labels: plantLabels,
-                    datasets: [{
-                        label: 'Total Budget (BDT)',
-                        data: plantCosts,
-                        backgroundColor: EPIC_COLORS.sky,
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { callback: v => '৳ ' + formatNumber(v) } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-        }
-
-        function renderBudgetTable(data) {
-            const tbody = document.getElementById('budgetTableBody');
-            const countBadge = document.getElementById('budgetRecordCount');
-            const searchVal = (document.getElementById('budgetSearchInput').value || '').toLowerCase().trim();
-
-            let displayed = data;
-            if (searchVal) {
-                displayed = data.filter(r => {
-                    return (r.plant && r.plant.toLowerCase().includes(searchVal)) ||
-                        (r.section && r.section.toLowerCase().includes(searchVal)) ||
-                        (r.utility && r.utility.toLowerCase().includes(searchVal)) ||
-                        (r.source && r.source.toLowerCase().includes(searchVal));
-                });
-            }
-
-            countBadge.textContent = `${displayed.length} Budget Items`;
-
-            if (displayed.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="17" style="text-align: center; padding: 30px; color: var(--text-muted);">No budget records match criteria</td></tr>`;
-                return;
-            }
-
-            tbody.innerHTML = displayed.map(row => {
-                const mCols = BUDGET_MONTHS.map(m => {
-                    const val = (row.months && row.months[m]) ? Number(row.months[m]) : 0;
-                    return `<td class="text-right" style="font-variant-numeric:tabular-nums; font-size:12px;">${val > 0 ? val.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : '-'}</td>`;
-                }).join('');
-
-                const totalVal = Number(row.total) || 0;
-
-                return `
-                    <tr>
-                        <td><span class="badge-plant-pill">${row.plant}</span></td>
-                        <td><strong>${row.section}</strong></td>
-                        <td>${row.utility}</td>
-                        <td style="color:var(--text-muted);">${row.source}</td>
-                        ${mCols}
-                        <td class="text-right cost-text" style="background:var(--surface-muted); font-size:13px;">৳ ${totalVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function onBudgetSearch() {
-            renderBudgetTable(filteredBudgetData);
-        }
-
-        function exportBudgetCSV() {
-            if (!filteredBudgetData || filteredBudgetData.length === 0) {
-                alert("No budget records available to export.");
-                return;
-            }
-
-            const headers = ["Plant", "Section", "Utility", "Source", ...BUDGET_MONTHS, "Total_FY26-27"];
-            const csvRows = [headers.join(",")];
-
-            filteredBudgetData.forEach(row => {
-                const mValues = BUDGET_MONTHS.map(m => (row.months && row.months[m]) ? row.months[m] : 0);
-                const values = [
-                    `"${row.plant || ''}"`,
-                    `"${row.section || ''}"`,
-                    `"${row.utility || ''}"`,
-                    `"${row.source || ''}"`,
-                    ...mValues,
-                    row.total || 0
-                ];
-                csvRows.push(values.join(","));
-            });
-
-            const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `EPIC_Allocated_Budget_FY26-27_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
         /* ==========================================================================
            HELPERS: LOADING OVERLAY & STATUS TOASTS
            ========================================================================== */
@@ -7444,7 +5954,7 @@
 
             try {
                 const start = performance.now();
-                const res = await fetch('/api/health');
+                const res = await fetch('/api/health', { credentials: 'same-origin' });
                 const latency = Math.round(performance.now() - start);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
@@ -7536,7 +6046,7 @@
             }
 
             try {
-                const res = await fetch('/api/cache/clear', { method: 'POST' });
+                const res = await fetch('/api/cache/clear', { method: 'POST', credentials: 'same-origin' });
                 const json = await res.json();
                 showStatus(json.message || 'Cache flushed successfully.', 'success');
                 openSystemHealthModal(); // Refresh modal display
@@ -7553,13 +6063,17 @@
 
         // Query telemetry in the background on initial load to update header label
         async function pingSystemHealthTelemetry() {
+            // /api/health returns cache details only to an administrator
+            // session; a plant session gets a bare liveness response, and the
+            // diagnostics pill it would label is hidden for them anyway.
+            if (sessionRole !== 'admin') return;
             try {
-                const res = await fetch('/api/health');
+                const res = await fetch('/api/health', { credentials: 'same-origin' });
                 if (res.ok) {
                     const data = await res.json();
                     const lbl = document.getElementById('cacheStatusLabel');
-                    if (lbl) {
-                        lbl.textContent = data.caching?.provider || 'Redis / Cache';
+                    if (lbl && data.caching) {
+                        lbl.textContent = data.caching.provider || 'Redis / Cache';
                     }
                 }
             } catch (e) {}
