@@ -130,7 +130,7 @@ function logActivity(logData) {
       ]);
     }
     
-    const tz = Session.getScriptTimeZone();
+    const tz = 'Asia/Dhaka';
     const now = new Date();
     const dateStr = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
     const timeStr = Utilities.formatDate(now, tz, 'HH:mm:ss');
@@ -334,7 +334,7 @@ function submitAdjustmentRequest(payload) {
       sheet.setColumnWidth(15, 120); // Review Date
     }
 
-    const tz = Session.getScriptTimeZone();
+    const tz = 'Asia/Dhaka';
     const now = new Date();
     const timestampStr = Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm:ss');
     const dateCompact = Utilities.formatDate(now, tz, 'yyyyMMdd');

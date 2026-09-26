@@ -2,7 +2,7 @@
 
 > **Central Engineering &bull; EPIC Group**  
 > **Developed by:** Raisul Islam Ratul | MTO | Central Engineering  
-> **Standard:** ISO 50001 Calibrated Energy Monitoring & Audit System
+> **System:** Enterprise Energy & Utility Consumption Monitoring Platform
 
 ---
 
@@ -33,13 +33,13 @@
    - Configurable via `REDIS_URL`, `KV_URL`, or `UPSTASH_REDIS_URL` environment variables.
    - Automatic cache invalidation on new entries or adjustment requests.
 2. **System Health & Cache Telemetry (`/api/health`):**
-   - Real-time diagnostic endpoint and interactive UI modal showing uptime, active caching provider, cached key counts, latency, and Google Sheets connectivity.
+   - Real-time diagnostic endpoint and interactive UI modal showing uptime, active caching provider, cached key counts, latency, and Google Sheets connectivity with Bangladesh Standard Time (BST, UTC+6).
    - Manual cache flush endpoint (`POST /api/cache/clear`).
-3. **Consolidated ISO 50001 Audit CSV Export (`/api/export-csv`):**
+3. **Consolidated Utility Audit CSV Export (`/api/export-csv`):**
    - Instant one-click CSV export consolidating historical utility consumption data across all 6 manufacturing plants.
 4. **Live Register Search & Category Filters:**
    - Instant search across meter equipment, source, utility type, and section.
-   - Category filter pills for rapid isolation of `⚡ Electricity`, `💧 Water`, `🔥 Gas & Fuel`, and `💨 Steam`.
+   - Category filter pills for rapid isolation of Electricity, Water, Gas & Fuel, and Steam with responsive mobile touch layout.
 5. **Offline Draft Auto-Save & Recovery:**
    - Real-time background auto-saving of unsubmitted readings into `localStorage`.
    - Automatic draft restore prompt if a technician accidentally closes or reloads the tab before submitting.

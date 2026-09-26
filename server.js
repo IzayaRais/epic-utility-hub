@@ -27,6 +27,16 @@ const CONFIG = {
   ADJUSTMENT_SHEET_NAME: 'Adjustment/Correction Record'
 };
 
+// Helper: Get formatted date and time in Bangladesh Standard Time (BST, UTC+6)
+function getBDTime(date = new Date()) {
+  const formatterDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const formatterTime = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const dateStr = formatterDate.format(date); // YYYY-MM-DD
+  const timeStr = formatterTime.format(date); // HH:mm:ss
+  const dateCompact = dateStr.replace(/-/g, ''); // YYYYMMDD
+  return { dateStr, timeStr, dateCompact, fullStr: `${dateStr} ${timeStr}` };
+}
+
 // ============================================================================
 // 1. REDIS & HIGH-SPEED IN-MEMORY HYBRID CACHING SYSTEM
 // ============================================================================
@@ -220,9 +230,11 @@ app.get('/', (req, res) => {
 // Endpoint: Health & System Diagnostics (Redis, Sheets, Uptime, Cache stats)
 app.get('/api/health', (req, res) => {
   const uptimeSec = Math.floor((Date.now() - START_TIME) / 1000);
+  const bd = getBDTime();
   res.json({
     status: 'healthy',
-    timestamp: new Date().toISOString(),
+    timestamp: bd.fullStr,
+    timezone: 'Asia/Dhaka (BST, UTC+6)',
     uptimeSeconds: uptimeSec,
     version: '2.0.0-pro',
     caching: {
@@ -428,19 +440,17 @@ app.post('/api/submit-data', async (req, res) => {
     await cacheDel(`readings:${plant}`);
     await cacheDel('dashboard');
 
-    // Also record activity to Logs sheet
+    // Also record activity to Logs sheet in BD Time
     try {
-      const now = new Date();
-      const dateStr = now.toISOString().split('T')[0];
-      const timeStr = now.toTimeString().split(' ')[0];
+      const bd = getBDTime();
       await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: `${CONFIG.LOGS_SHEET_NAME}!A:A`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [[
-            dateStr,
-            timeStr,
+            bd.dateStr,
+            bd.timeStr,
             plant,
             records[0].date,
             isOvertime ? 'Overtime Data Submitted' : 'Data Submitted',
@@ -475,17 +485,13 @@ app.post('/api/submit-data', async (req, res) => {
 app.post('/api/adjustment', async (req, res) => {
   try {
     const payload = req.body || {};
-    const now = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const dateCompact = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
-    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    const timestampStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${timeStr}`;
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const requestId = `REQ-${dateCompact}-${randomSuffix}`;
+    const bd = getBDTime();
+    const requestId = `REQ-${bd.dateCompact}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const timestampStr = bd.fullStr;
 
     const plant = payload.plant || 'Unknown';
     const shiftType = payload.shiftType || (payload.isOvertime ? 'Overtime' : 'Regular');
-    const targetDate = payload.targetDate || payload.entryDate || dateCompact;
+    const targetDate = payload.targetDate || payload.entryDate || bd.dateStr;
     const register = payload.register || payload.registerName || 'General / All Registers';
     const wrongVal = payload.wrongValue !== undefined && payload.wrongValue !== null ? String(payload.wrongValue).trim() : (payload.existingReading || '');
     const correctVal = payload.correctValue !== undefined && payload.correctValue !== null ? String(payload.correctValue).trim() : (payload.proposedReading || '');
@@ -521,17 +527,16 @@ app.post('/api/adjustment', async (req, res) => {
     // Invalidate dashboard cache
     await cacheDel('dashboard');
 
-    // Also record event to central audit Logs sheet
+    // Also record event to central audit Logs sheet in BD Time
     try {
-      const dateStr = now.toISOString().split('T')[0];
       await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: `${CONFIG.LOGS_SHEET_NAME}!A:A`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [[
-            dateStr,
-            timeStr,
+            bd.dateStr,
+            bd.timeStr,
             plant,
             targetDate,
             'Adjustment Request Submitted',
@@ -560,9 +565,7 @@ app.post('/api/adjustment', async (req, res) => {
 app.post('/api/log-activity', async (req, res) => {
   try {
     const logData = req.body || {};
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    const timeStr = now.toTimeString().split(' ')[0];
+    const bd = getBDTime();
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
@@ -570,10 +573,10 @@ app.post('/api/log-activity', async (req, res) => {
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
-          dateStr,
-          timeStr,
+          bd.dateStr,
+          bd.timeStr,
           logData.plant || '',
-          logData.entryDate || dateStr,
+          logData.entryDate || bd.dateStr,
           logData.action || 'Activity',
           logData.details || '',
           (logData.records !== undefined && logData.records !== null) ? logData.records : '',
