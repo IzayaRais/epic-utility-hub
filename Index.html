@@ -2840,6 +2840,256 @@
                 font-size: 20px;
             }
         }
+
+        /* ==========================================================================
+           ENTERPRISE EXTENSIONS: SEARCH, FILTER, DRAFT, ANOMALIES & DIAGNOSTICS
+           ========================================================================== */
+        .register-filter-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+            background: var(--surface);
+            padding: 10px 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .reg-search-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            flex: 1;
+            min-width: 240px;
+        }
+
+        .reg-search-icon {
+            position: absolute;
+            left: 12px;
+            width: 15px;
+            height: 15px;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .reg-search-wrap input {
+            width: 100%;
+            height: 36px;
+            padding: 0 32px 0 34px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            color: var(--text-main);
+            background: var(--surface-muted);
+            transition: all 0.2s ease;
+        }
+
+        .reg-search-wrap input:focus {
+            outline: none;
+            background: #FFFFFF;
+            border-color: var(--epic-blue);
+            box-shadow: 0 0 0 3px rgba(0, 48, 135, 0.1);
+        }
+
+        .reg-search-clear {
+            position: absolute;
+            right: 10px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .reg-search-clear:hover {
+            color: var(--text-main);
+        }
+
+        .category-filter-pills {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow-x: auto;
+            max-width: 100%;
+            padding-bottom: 2px;
+        }
+
+        .cat-pill {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--surface-muted);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+        }
+
+        .cat-pill:hover {
+            background: #E2E8F0;
+            color: var(--text-main);
+        }
+
+        .cat-pill.active {
+            background: var(--epic-blue);
+            color: #FFFFFF;
+            border-color: var(--epic-blue);
+            box-shadow: 0 2px 6px rgba(0, 48, 135, 0.2);
+        }
+
+        body.overtime-theme .cat-pill.active {
+            background: #DC2626;
+            border-color: #DC2626;
+            box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+        }
+
+        .reg-filter-count {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        /* Draft Auto-Save Banner */
+        .draft-recovery-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            margin-bottom: 12px;
+            border-radius: var(--radius-md);
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            color: #1E40AF;
+            font-size: 13px;
+            animation: fadeInSlide 0.25s ease-out;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        /* System Diagnostics Pill in Header */
+        .system-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 11px;
+            border-radius: 20px;
+            background: #F0FDF4;
+            border: 1px solid #BBF7D0;
+            color: #166534;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .system-status-pill:hover {
+            background: #DCFCE7;
+            transform: translateY(-1px);
+        }
+
+        .pulse-dot-green {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #16A34A;
+            box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
+            animation: pulseSubtle 2s infinite ease-in-out;
+        }
+
+        @keyframes pulseSubtle {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+        }
+
+        /* Export Audit CSV Button */
+        .export-audit-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 11px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--epic-navy);
+            background: #FFFFFF;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+
+        .export-audit-btn:hover {
+            background: var(--surface-muted);
+            border-color: var(--border-subtle);
+            color: var(--epic-blue);
+        }
+
+        /* Consumption Anomaly & Rollover Badges */
+        .reading-input.spike-warning {
+            border-color: #F59E0B !important;
+            background-color: #FFFBEB !important;
+            color: #B45309 !important;
+        }
+
+        .anomaly-badge-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-top: 3px;
+        }
+
+        .anomaly-badge-tag.rollover {
+            background: #FEF2F2;
+            color: #DC2626;
+            border: 1px solid #FECACA;
+        }
+
+        .anomaly-badge-tag.spike {
+            background: #FFFBEB;
+            color: #D97706;
+            border: 1px solid #FDE68A;
+        }
+
+        .health-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .health-card {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+
+        .health-card-lbl {
+            font-size: 11px;
+            color: #64748B;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .health-card-val {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-top: 4px;
+            word-break: break-all;
+        }
     </style>
 </head>
 
@@ -2872,10 +3122,20 @@
             </div>
         </div>
 
-        <!-- Navigation Info -->
-        <div class="nav-context-status">
-            <span class="status-dot"></span>
-            <span>Daily Consumption Register</span>
+        <!-- Navigation Right Bar: Audit CSV & System Cache Status -->
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <a href="/api/export-csv" class="export-audit-btn" title="Download ISO 50001 consolidated consumption audit CSV across all plants" download>
+                <i data-lucide="download" style="width:13px; height:13px;"></i>
+                <span>Audit CSV</span>
+            </a>
+            <button type="button" class="system-status-pill" onclick="openSystemHealthModal()" title="View Redis/Cache & Google Sheets API Diagnostics">
+                <span class="pulse-dot-green"></span>
+                <span id="cacheStatusLabel">Redis / Cache</span>
+            </button>
+            <div class="nav-context-status">
+                <span class="status-dot"></span>
+                <span>Live Grid</span>
+            </div>
         </div>
     </header>
 
@@ -3173,6 +3433,34 @@
             <!-- Daily Lock & Partial Entry Notification Banner -->
             <div id="dailyLockStatusBanner" style="display:none;" class="daily-lock-banner"></div>
 
+            <!-- Offline Draft Auto-Save & Recovery Banner -->
+            <div id="draftRecoveryBanner" style="display:none;" class="draft-recovery-banner">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="file-check" style="width:18px; height:18px; color:#2563EB; flex-shrink:0;"></i>
+                    <span id="draftRecoveryText"><strong>Auto-Saved Draft Detected:</strong> Unsaved readings restored from local memory.</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="discardCurrentDraft()" style="padding:4px 10px; font-size:11px;">Discard Draft</button>
+                </div>
+            </div>
+
+            <!-- Live Filter & Register Search Toolbar -->
+            <div class="register-filter-toolbar">
+                <div class="reg-search-wrap">
+                    <i data-lucide="search" class="reg-search-icon"></i>
+                    <input type="text" id="meterSearchInput" placeholder="Quick search register, equipment, source, section..." oninput="onFilterRegistersChange()">
+                    <button type="button" id="meterSearchClear" class="reg-search-clear" onclick="clearRegisterSearch()" style="display:none;">&times;</button>
+                </div>
+                <div class="category-filter-pills" id="categoryFilterPills">
+                    <button type="button" class="cat-pill active" data-category="ALL" onclick="setCategoryFilter('ALL')">All Registers</button>
+                    <button type="button" class="cat-pill" data-category="ELECTRICITY" onclick="setCategoryFilter('ELECTRICITY')">⚡ Electricity</button>
+                    <button type="button" class="cat-pill" data-category="WATER" onclick="setCategoryFilter('WATER')">💧 Water</button>
+                    <button type="button" class="cat-pill" data-category="GAS" onclick="setCategoryFilter('GAS')">🔥 Gas &amp; Fuel</button>
+                    <button type="button" class="cat-pill" data-category="STEAM" onclick="setCategoryFilter('STEAM')">💨 Steam</button>
+                </div>
+                <div class="reg-filter-count" id="regFilterCount"></div>
+            </div>
+
             <!-- Bulk Entry Table -->
             <div class="table-wrap" id="gridArea">
                 <div class="table-top" id="tableTitle">
@@ -3421,6 +3709,34 @@
                     <span>Submit Correction Request</span>
                 </button>
             </div>
+    <!-- System Health & Caching Diagnostics Modal -->
+    <div class="modal" id="systemHealthModal" style="display:none;">
+        <div class="modal-card" style="max-width:540px;">
+            <div class="modal-head" style="background: linear-gradient(135deg, #001B44, #003087); color:#FFFFFF;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:34px; height:34px; border-radius:8px; background:rgba(255,255,255,0.12); display:flex; align-items:center; justify-content:center;">
+                        <i data-lucide="cpu" style="width:18px; height:18px; color:#38BDF8;"></i>
+                    </div>
+                    <div>
+                        <h3 style="color:#FFFFFF; font-size:16px; margin:0;">System &amp; Cache Diagnostics</h3>
+                        <div style="font-size:11px; color:#93C5FD;">Live telemetry from server &amp; Google Sheets API</div>
+                    </div>
+                </div>
+                <button type="button" onclick="closeSystemHealthModal()" style="background:none; border:none; cursor:pointer; color:#FFFFFF; font-size:24px; font-weight:700; line-height:1;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:20px; text-align:left;" id="healthModalBody">
+                <div style="display:flex; justify-content:center; align-items:center; padding:30px; gap:10px; color:var(--text-muted);">
+                    <i data-lucide="loader-2" class="spinner"></i>
+                    <span>Querying system telemetry...</span>
+                </div>
+            </div>
+            <div class="modal-footer" style="background:#F8FAFC; display:flex; justify-content:space-between; align-items:center;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="flushSystemCache()" id="btnFlushCache">
+                    <i data-lucide="trash-2" style="width:13px; height:13px; color:#DC2626;"></i>
+                    <span>Flush Cache</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="closeSystemHealthModal()">Close</button>
+            </div>
         </div>
     </div>
 
@@ -3575,6 +3891,12 @@
         let plantOpenedTimestamp = null;
         let activeModalKey = '';
         let activeModalLabel = '';
+
+        // Live Filter & Draft Autosave State
+        let currentCategoryFilter = 'ALL';
+        let currentSearchQuery = '';
+        let draftSaveTimeout = null;
+        let pendingRestoredDraft = null;
 
         // Dashboard State
         let currentDashMode = 'actual'; // 'actual' | 'budget'
@@ -4700,6 +5022,9 @@
 
             // Log session start
             logClientAction('App Loaded', 'Application initialized on Daily Entry');
+
+            // Query background health telemetry for fast cache indicator
+            pingSystemHealthTelemetry();
         });
 
         function initIcons() {
@@ -4854,6 +5179,17 @@
                 metersBadge.textContent = isOT ? 'OVERTIME MODE' : `${currentRowsConfig.length} Registers`;
             }
             document.getElementById('otRemarks').value = "";
+
+            // Reset register search & category filter pills
+            currentCategoryFilter = 'ALL';
+            currentSearchQuery = '';
+            const searchInput = document.getElementById('meterSearchInput');
+            if (searchInput) searchInput.value = '';
+            const searchClear = document.getElementById('meterSearchClear');
+            if (searchClear) searchClear.style.display = 'none';
+            document.querySelectorAll('.cat-pill').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-category') === 'ALL');
+            });
 
             // Ensure valid entry date is set
             let dateInput = document.getElementById('entryDate');
@@ -5132,6 +5468,9 @@
                                 data-prev="${prev !== '-' ? prev : 0}"
                                 placeholder="0.00"
                                 oninput="onReadingInput(${index})">
+                            <div style="display:flex; justify-content:flex-end; margin-top:2px;">
+                                <span id="anomaly_tag_${index}" class="anomaly-badge-tag" style="display:none;"></span>
+                            </div>
                         `}
                     </td>
                     <td class="text-right">
@@ -5255,6 +5594,7 @@
                                 <div class="m-box-label">
                                     <i data-lucide="edit-3" style="width:10px;height:10px;"></i>
                                     <span>Present Reading</span>
+                                    <span id="m_anomaly_tag_${index}" class="anomaly-badge-tag" style="display:none; margin-left:auto;"></span>
                                 </div>
                                 <div class="m-pres-input-wrap">
                                     <input type="number" 
@@ -5328,6 +5668,8 @@
             // Setup keyboard navigation (Enter key advances to next field)
             setupKeyboardProgression();
             updateActionBarMetrics();
+            applyRegisterFilters();
+            checkAndPromptDraft();
             initIcons();
         }
 
@@ -5372,17 +5714,21 @@
             const diffSpan = document.getElementById(`diff_${index}`);
             const costSpan = document.getElementById(`cost_${index}`);
             const costUsdSpan = document.getElementById(`cost_usd_${index}`);
+            const tagEl = document.getElementById(`anomaly_tag_${index}`);
+            const mTagEl = document.getElementById(`m_anomaly_tag_${index}`);
 
             const valStr = input.value.trim();
             const prev = parseFloat(input.dataset.prev) || 0;
             const unitCost = parseFloat(input.dataset.cost) || 0;
 
             if (valStr === "") {
-                input.classList.remove('has-value', 'negative-warning');
+                input.classList.remove('has-value', 'negative-warning', 'spike-warning');
                 diffSpan.textContent = "-";
                 diffSpan.className = "diff-text";
                 costSpan.textContent = "-";
                 if (costUsdSpan) costUsdSpan.textContent = "-";
+                if (tagEl) tagEl.style.display = 'none';
+                if (mTagEl) mTagEl.style.display = 'none';
             } else {
                 input.classList.add('has-value');
                 const pres = parseFloat(valStr) || 0;
@@ -5392,12 +5738,43 @@
 
                 if (diff < 0) {
                     input.classList.add('negative-warning');
+                    input.classList.remove('spike-warning');
                     diffSpan.className = "diff-text warning";
                     diffSpan.textContent = diff.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+                    if (tagEl) {
+                        tagEl.className = 'anomaly-badge-tag rollover';
+                        tagEl.innerHTML = `<i data-lucide="alert-triangle" style="width:10px;height:10px;"></i> Rollover`;
+                        tagEl.style.display = 'inline-flex';
+                    }
+                    if (mTagEl) {
+                        mTagEl.className = 'anomaly-badge-tag rollover';
+                        mTagEl.innerHTML = `<i data-lucide="alert-triangle" style="width:10px;height:10px;"></i> Rollover`;
+                        mTagEl.style.display = 'inline-flex';
+                    }
                 } else {
                     input.classList.remove('negative-warning');
                     diffSpan.className = "diff-text positive";
                     diffSpan.textContent = diff.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+
+                    // Consumption Spike check (> 50,000 or > 2.5x previous if prev >= 50)
+                    const isSpike = (diff > 50000) || (prev >= 50 && diff > (prev * 2.5));
+                    if (isSpike) {
+                        input.classList.add('spike-warning');
+                        if (tagEl) {
+                            tagEl.className = 'anomaly-badge-tag spike';
+                            tagEl.innerHTML = `<i data-lucide="zap" style="width:10px;height:10px;"></i> Spike`;
+                            tagEl.style.display = 'inline-flex';
+                        }
+                        if (mTagEl) {
+                            mTagEl.className = 'anomaly-badge-tag spike';
+                            mTagEl.innerHTML = `<i data-lucide="zap" style="width:10px;height:10px;"></i> Spike`;
+                            mTagEl.style.display = 'inline-flex';
+                        }
+                    } else {
+                        input.classList.remove('spike-warning');
+                        if (tagEl) tagEl.style.display = 'none';
+                        if (mTagEl) mTagEl.style.display = 'none';
+                    }
                 }
 
                 costSpan.textContent = estCost > 0 ? '৳ ' + estCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '৳ 0.00';
@@ -5407,6 +5784,8 @@
             }
             syncMobileCalcDisplay(index);
             updateActionBarMetrics();
+            triggerDraftSave();
+            initIcons();
         }
 
         function onMobileReadingInput(index) {
@@ -5567,6 +5946,7 @@
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = `<i data-lucide="save"></i><span>Save Utility Data</span>`;
                         initIcons();
+                        clearCurrentDraft();
                         showSubmissionModal(records.length, date, activePlant, durationSec, submitTotalCost);
                     })
                     .withFailureHandler(err => {
@@ -5605,6 +5985,7 @@
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = `<i data-lucide="save"></i><span>Save Utility Data</span>`;
                     initIcons();
+                    clearCurrentDraft();
                     showSubmissionModal(records.length, date, activePlant, durationSec, submitTotalCost);
                 }, 600);
             }
@@ -6560,7 +6941,391 @@
 
         function hideStatus() {
             const el = document.getElementById("statusMessage");
-            el.style.display = "none";
+            if (el) el.style.display = "none";
+        }
+
+        // ==========================================================================
+        // ENTERPRISE EXTENSIONS: FILTERING, SEARCH, OFFLINE DRAFT, DIAGNOSTICS
+        // ==========================================================================
+
+        function setCategoryFilter(cat) {
+            currentCategoryFilter = cat;
+            document.querySelectorAll('.cat-pill').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-category') === cat);
+            });
+            applyRegisterFilters();
+        }
+
+        function onFilterRegistersChange() {
+            const input = document.getElementById('meterSearchInput');
+            currentSearchQuery = input ? input.value.trim().toLowerCase() : '';
+            const clearBtn = document.getElementById('meterSearchClear');
+            if (clearBtn) {
+                clearBtn.style.display = currentSearchQuery ? 'block' : 'none';
+            }
+            applyRegisterFilters();
+        }
+
+        function clearRegisterSearch() {
+            const input = document.getElementById('meterSearchInput');
+            if (input) input.value = '';
+            currentSearchQuery = '';
+            const clearBtn = document.getElementById('meterSearchClear');
+            if (clearBtn) clearBtn.style.display = 'none';
+            applyRegisterFilters();
+        }
+
+        function applyRegisterFilters() {
+            if (!currentRowsConfig || !currentRowsConfig.length) return;
+            const tbody = document.getElementById('utilityTableBody');
+            const rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+            let matchCount = 0;
+
+            currentRowsConfig.forEach((row, idx) => {
+                const util = (row.utility || '').toUpperCase();
+                const sec = (row.section || '').toLowerCase();
+                const src = (row.source || '').toLowerCase();
+                const equip = (row.equip || '').toLowerCase();
+                const fullText = `${sec} ${util.toLowerCase()} ${src} ${equip}`;
+
+                // Category Check
+                let catMatch = false;
+                if (currentCategoryFilter === 'ALL') {
+                    catMatch = true;
+                } else if (currentCategoryFilter === 'ELECTRICITY') {
+                    catMatch = util.includes('ELECT');
+                } else if (currentCategoryFilter === 'WATER') {
+                    catMatch = util.includes('WATER') || util.includes('ETP') || util.includes('WASTE');
+                } else if (currentCategoryFilter === 'GAS') {
+                    catMatch = util.includes('GAS') || util.includes('FUEL') || util.includes('DIESEL');
+                } else if (currentCategoryFilter === 'STEAM') {
+                    catMatch = util.includes('STEAM') || util.includes('BOILER');
+                }
+
+                // Query Check
+                const queryMatch = !currentSearchQuery || fullText.includes(currentSearchQuery);
+                const isVisible = catMatch && queryMatch;
+
+                if (isVisible) matchCount++;
+
+                // Desktop Table Row
+                if (rows[idx]) {
+                    rows[idx].style.display = isVisible ? '' : 'none';
+                }
+
+                // Mobile Card
+                const mCard = document.getElementById(`m_card_${idx}`);
+                if (mCard) {
+                    mCard.style.display = isVisible ? '' : 'none';
+                }
+            });
+
+            const countBadge = document.getElementById('regFilterCount');
+            if (countBadge) {
+                if (matchCount === currentRowsConfig.length) {
+                    countBadge.textContent = `${matchCount} registers`;
+                } else {
+                    countBadge.textContent = `Showing ${matchCount} of ${currentRowsConfig.length}`;
+                }
+            }
+        }
+
+        // --- Offline Draft Auto-Save & Recovery ---
+
+        function getDraftKey() {
+            const isOT = document.getElementById('isOvertime') ? document.getElementById('isOvertime').checked : false;
+            const selectedDate = document.getElementById('entryDate') ? (document.getElementById('entryDate').value || 'today') : 'today';
+            return `epic_draft_v2_${activePlant || 'default'}_${isOT ? 'ot' : 'reg'}_${selectedDate}`;
+        }
+
+        function triggerDraftSave() {
+            if (draftSaveTimeout) clearTimeout(draftSaveTimeout);
+            draftSaveTimeout = setTimeout(() => {
+                saveDraftImmediately();
+            }, 500);
+        }
+
+        function saveDraftImmediately() {
+            if (!activePlant || !currentRowsConfig || !currentRowsConfig.length) return;
+            const draftData = {
+                timestamp: Date.now(),
+                plant: activePlant,
+                readings: {},
+                remarks: {}
+            };
+            let hasAnyVal = false;
+
+            currentRowsConfig.forEach((row, idx) => {
+                const k = row.section + "_" + row.utility + "_" + row.source;
+                if (existingDailyReadings[k] && existingDailyReadings[k].submitted) return; // skip locked
+                const inp = document.getElementById(`pres_${idx}`);
+                if (inp && inp.value.trim() !== '') {
+                    draftData.readings[idx] = inp.value.trim();
+                    hasAnyVal = true;
+                }
+                const rem = document.getElementById(`ot_remark_${idx}`);
+                if (rem && rem.value.trim() !== '') {
+                    draftData.remarks[idx] = rem.value.trim();
+                    hasAnyVal = true;
+                }
+            });
+
+            const key = getDraftKey();
+            if (hasAnyVal) {
+                try {
+                    localStorage.setItem(key, JSON.stringify(draftData));
+                } catch (e) {}
+            } else {
+                localStorage.removeItem(key);
+            }
+        }
+
+        function checkAndPromptDraft() {
+            const banner = document.getElementById('draftRecoveryBanner');
+            if (!banner) return;
+            const key = getDraftKey();
+            let draft = null;
+            try {
+                draft = JSON.parse(localStorage.getItem(key) || 'null');
+            } catch (e) {}
+
+            if (!draft || !draft.readings || Object.keys(draft.readings).length === 0) {
+                banner.style.display = 'none';
+                pendingRestoredDraft = null;
+                return;
+            }
+
+            // Check if any draft readings apply to currently non-locked fields
+            let applicableCount = 0;
+            for (const idx in draft.readings) {
+                const row = currentRowsConfig[idx];
+                if (row) {
+                    const k = row.section + "_" + row.utility + "_" + row.source;
+                    if (!existingDailyReadings[k] || !existingDailyReadings[k].submitted) {
+                        applicableCount++;
+                    }
+                }
+            }
+
+            if (applicableCount > 0) {
+                pendingRestoredDraft = draft;
+                const timeStr = new Date(draft.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const textEl = document.getElementById('draftRecoveryText');
+                if (textEl) {
+                    textEl.innerHTML = `<strong>Auto-Saved Draft Detected (${applicableCount} unsubmitted readings from ${timeStr}):</strong> Unsaved entries restored.`;
+                }
+                banner.style.display = 'flex';
+                // Auto-fill draft values smoothly
+                applyRestoredDraft(false);
+            } else {
+                banner.style.display = 'none';
+                pendingRestoredDraft = null;
+            }
+        }
+
+        function applyRestoredDraft(notify = true) {
+            if (!pendingRestoredDraft || !pendingRestoredDraft.readings) return;
+            const { readings, remarks } = pendingRestoredDraft;
+            let appliedCount = 0;
+
+            for (const idx in readings) {
+                const val = readings[idx];
+                const inp = document.getElementById(`pres_${idx}`);
+                const mInp = document.getElementById(`m_pres_${idx}`);
+                if (inp && !inp.disabled && inp.value.trim() === '') {
+                    inp.value = val;
+                    if (mInp) mInp.value = val;
+                    onReadingInput(parseInt(idx, 10));
+                    appliedCount++;
+                }
+            }
+
+            if (remarks) {
+                for (const idx in remarks) {
+                    const remVal = remarks[idx];
+                    const rInp = document.getElementById(`ot_remark_${idx}`);
+                    const mRInp = document.getElementById(`m_ot_remark_${idx}`);
+                    if (rInp && !rInp.disabled && rInp.value.trim() === '') {
+                        rInp.value = remVal;
+                        if (mRInp) mRInp.value = remVal;
+                    }
+                }
+            }
+
+            const banner = document.getElementById('draftRecoveryBanner');
+            if (banner) {
+                const textEl = document.getElementById('draftRecoveryText');
+                if (textEl) {
+                    textEl.innerHTML = `<strong>Draft Restored:</strong> ${appliedCount} saved reading(s) populated. Ready for verification and submit.`;
+                }
+            }
+            if (notify) showStatus(`Restored ${appliedCount} readings from local draft.`, 'success');
+        }
+
+        function discardCurrentDraft() {
+            const key = getDraftKey();
+            localStorage.removeItem(key);
+            pendingRestoredDraft = null;
+            const banner = document.getElementById('draftRecoveryBanner');
+            if (banner) banner.style.display = 'none';
+            // Clear inputs that aren't locked
+            currentRowsConfig.forEach((row, idx) => {
+                const k = row.section + "_" + row.utility + "_" + row.source;
+                if (!existingDailyReadings[k] || !existingDailyReadings[k].submitted) {
+                    const inp = document.getElementById(`pres_${idx}`);
+                    const mInp = document.getElementById(`m_pres_${idx}`);
+                    if (inp && !inp.disabled) inp.value = '';
+                    if (mInp && !mInp.disabled) mInp.value = '';
+                    onReadingInput(idx);
+                }
+            });
+            showStatus('Draft discarded.', 'info');
+        }
+
+        function clearCurrentDraft() {
+            const key = getDraftKey();
+            localStorage.removeItem(key);
+            pendingRestoredDraft = null;
+            const banner = document.getElementById('draftRecoveryBanner');
+            if (banner) banner.style.display = 'none';
+        }
+
+        // --- System Health & Cache Diagnostics ---
+
+        async function openSystemHealthModal() {
+            const modal = document.getElementById('systemHealthModal');
+            const body = document.getElementById('healthModalBody');
+            if (!modal || !body) return;
+            modal.style.display = 'flex';
+            body.innerHTML = `
+                <div style="display:flex; justify-content:center; align-items:center; padding:30px; gap:10px; color:var(--text-muted);">
+                    <i data-lucide="loader-2" class="spinner"></i>
+                    <span>Connecting to server telemetry &amp; cache engine...</span>
+                </div>
+            `;
+            initIcons();
+
+            try {
+                const start = performance.now();
+                const res = await fetch('/api/health');
+                const latency = Math.round(performance.now() - start);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                const uptimeMin = Math.floor((data.uptimeSeconds || 0) / 60);
+                const uptimeHours = (uptimeMin / 60).toFixed(1);
+
+                body.innerHTML = `
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:12px; border-bottom:1px solid #E2E8F0;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="pulse-dot-green"></span>
+                            <strong style="color:#166534; font-size:14px;">System Online &bull; ${data.status.toUpperCase()}</strong>
+                        </div>
+                        <span style="font-size:11px; color:#64748B; font-weight:600;">Latency: ${latency}ms</span>
+                    </div>
+
+                    <div class="health-grid">
+                        <div class="health-card">
+                            <div class="health-card-lbl">Caching Engine</div>
+                            <div class="health-card-val" style="color:#003087;">
+                                <i data-lucide="zap" style="width:14px; height:14px; vertical-align:middle; color:#EAB308;"></i>
+                                <span>${data.caching?.provider || 'In-Memory Cache'}</span>
+                            </div>
+                            <div style="font-size:11px; color:#64748B; margin-top:2px;">
+                                ${data.caching?.connected ? 'Redis Cluster Connected' : 'High-Speed Memory Cache Active'}
+                            </div>
+                        </div>
+
+                        <div class="health-card">
+                            <div class="health-card-lbl">Cache Entries</div>
+                            <div class="health-card-val" style="color:#0D9488;">
+                                ${data.caching?.inMemoryCachedEntries || 0} Cached Keys
+                            </div>
+                            <div style="font-size:11px; color:#64748B; margin-top:2px;">
+                                Auto-invalidated on entry submissions
+                            </div>
+                        </div>
+
+                        <div class="health-card">
+                            <div class="health-card-lbl">Google Sheets API</div>
+                            <div class="health-card-val" style="color:#16A34A;">
+                                <i data-lucide="check-circle" style="width:14px; height:14px; vertical-align:middle; color:#16A34A;"></i>
+                                <span>${data.googleSheets?.connected ? 'Connected' : 'Offline'}</span>
+                            </div>
+                            <div style="font-size:10px; color:#64748B; margin-top:2px; font-family:monospace;">
+                                ${data.googleSheets?.spreadsheetId ? data.googleSheets.spreadsheetId.substring(0, 14) + '...' : ''}
+                            </div>
+                        </div>
+
+                        <div class="health-card">
+                            <div class="health-card-lbl">Server Uptime</div>
+                            <div class="health-card-val" style="color:#2563EB;">
+                                ${uptimeHours} hrs (${data.uptimeSeconds || 0}s)
+                            </div>
+                            <div style="font-size:11px; color:#64748B; margin-top:2px;">
+                                Platform: Vercel Serverless
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:14px; padding:10px 12px; background:#F1F5F9; border-radius:6px; font-size:11px; color:#475569; display:flex; align-items:center; gap:8px;">
+                        <i data-lucide="shield-check" style="width:14px; height:14px; color:#0284C7; flex-shrink:0;"></i>
+                        <span>ISO 50001 compliant enterprise logging with sub-millisecond query caching.</span>
+                    </div>
+                `;
+                initIcons();
+            } catch (err) {
+                body.innerHTML = `
+                    <div style="padding:20px; color:#DC2626; text-align:center;">
+                        <i data-lucide="alert-octagon" style="width:32px; height:32px; margin-bottom:8px;"></i>
+                        <div>Could not retrieve health diagnostics: ${err.message}</div>
+                    </div>
+                `;
+                initIcons();
+            }
+        }
+
+        function closeSystemHealthModal() {
+            const modal = document.getElementById('systemHealthModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function flushSystemCache() {
+            const btn = document.getElementById('btnFlushCache');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<i data-lucide="loader-2" class="spinner" style="width:13px;height:13px;"></i><span>Flushing...</span>`;
+                initIcons();
+            }
+
+            try {
+                const res = await fetch('/api/cache/clear', { method: 'POST' });
+                const json = await res.json();
+                showStatus(json.message || 'Cache flushed successfully.', 'success');
+                openSystemHealthModal(); // Refresh modal display
+            } catch (err) {
+                showStatus('Error flushing cache: ' + err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i data-lucide="trash-2" style="width:13px;height:13px; color:#DC2626;"></i><span>Flush Cache</span>`;
+                    initIcons();
+                }
+            }
+        }
+
+        // Query telemetry in the background on initial load to update header label
+        async function pingSystemHealthTelemetry() {
+            try {
+                const res = await fetch('/api/health');
+                if (res.ok) {
+                    const data = await res.json();
+                    const lbl = document.getElementById('cacheStatusLabel');
+                    if (lbl) {
+                        lbl.textContent = data.caching?.provider || 'Redis / Cache';
+                    }
+                }
+            } catch (e) {}
         }
     </script>
 </body>

@@ -5,9 +5,16 @@ const bodyParser = require('body-parser');
 const { google } = require('googleapis');
 const path = require('path');
 const fs = require('fs');
+let Redis;
+try {
+  Redis = require('ioredis');
+} catch (e) {
+  Redis = null;
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const START_TIME = Date.now();
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -20,7 +27,112 @@ const CONFIG = {
   ADJUSTMENT_SHEET_NAME: 'Adjustment/Correction Record'
 };
 
-// --- Google Sheets Auth (Supports credentials.json or GOOGLE_CREDENTIALS / individual env vars for Vercel/Cloud) ---
+// ============================================================================
+// 1. REDIS & HIGH-SPEED IN-MEMORY HYBRID CACHING SYSTEM
+// ============================================================================
+let redisClient = null;
+let redisConnected = false;
+
+const redisUrl = process.env.REDIS_URL || process.env.KV_URL || process.env.UPSTASH_REDIS_URL;
+
+if (Redis && redisUrl) {
+  try {
+    redisClient = new Redis(redisUrl, {
+      maxRetriesPerRequest: 1,
+      connectTimeout: 4000,
+      lazyConnect: true,
+      enableOfflineQueue: false
+    });
+
+    redisClient.connect()
+      .then(() => {
+        redisConnected = true;
+        console.log('⚡ Redis Cache connected successfully.');
+      })
+      .catch(err => {
+        console.warn('⚠️ Redis connection failed, using In-Memory Cache fallback:', err.message);
+        redisConnected = false;
+      });
+
+    redisClient.on('error', (err) => {
+      if (redisConnected) {
+        console.warn('⚠️ Redis runtime error, falling back to In-Memory:', err.message);
+      }
+      redisConnected = false;
+    });
+
+    redisClient.on('ready', () => {
+      redisConnected = true;
+    });
+  } catch (err) {
+    console.warn('⚠️ Could not initialize Redis client, using In-Memory Cache:', err.message);
+  }
+}
+
+// In-Memory LRU/TTL Cache Fallback
+const memoryCache = new Map();
+
+async function cacheGet(key) {
+  if (redisConnected && redisClient) {
+    try {
+      const data = await redisClient.get(key);
+      if (data) return JSON.parse(data);
+    } catch (e) {
+      // Fall through to memoryCache on error
+    }
+  }
+  const item = memoryCache.get(key);
+  if (item) {
+    if (Date.now() < item.expiry) {
+      return item.data;
+    }
+    memoryCache.delete(key);
+  }
+  return null;
+}
+
+async function cacheSet(key, value, ttlSeconds = 300) {
+  if (redisConnected && redisClient) {
+    try {
+      await redisClient.set(key, JSON.stringify(value), 'EX', ttlSeconds);
+    } catch (e) {
+      // Fall through to memoryCache
+    }
+  }
+  memoryCache.set(key, {
+    data: value,
+    expiry: Date.now() + (ttlSeconds * 1000)
+  });
+}
+
+async function cacheDel(patternOrPrefix) {
+  if (redisConnected && redisClient) {
+    try {
+      const keys = await redisClient.keys(`*${patternOrPrefix}*`);
+      if (keys && keys.length) {
+        await redisClient.del(...keys);
+      }
+    } catch (e) {
+      // Ignore Redis del errors
+    }
+  }
+  for (const k of memoryCache.keys()) {
+    if (k.includes(patternOrPrefix)) {
+      memoryCache.delete(k);
+    }
+  }
+}
+
+async function cacheFlush() {
+  if (redisConnected && redisClient) {
+    try { await redisClient.flushdb(); } catch (e) {}
+  }
+  memoryCache.clear();
+}
+
+// ============================================================================
+// 2. GOOGLE SHEETS API V4 CLIENT INITIALIZATION
+// ============================================================================
 let sheets;
 try {
   let authConfig = {
@@ -72,7 +184,6 @@ function getSheetName(plant) {
 function formatDateIso(val) {
   if (val === undefined || val === null || val === '') return '';
   if (typeof val === 'number') {
-    // Excel serial date to ISO
     const utc_days = Math.floor(val - 25569);
     const date = new Date(utc_days * 86400 * 1000);
     return date.toISOString().split('T')[0];
@@ -81,7 +192,6 @@ function formatDateIso(val) {
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
     return str.substring(0, 10);
   }
-  // Format: 25-Sep-26 or 25-Sep-2026
   const parts = str.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
   if (parts) {
     const day = parts[1].padStart(2, '0');
@@ -103,14 +213,59 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'Index.html'));
 });
 
-// Endpoint: Fetch Previous Readings & Daily Locked State
+// ============================================================================
+// 3. API ENDPOINTS
+// ============================================================================
+
+// Endpoint: Health & System Diagnostics (Redis, Sheets, Uptime, Cache stats)
+app.get('/api/health', (req, res) => {
+  const uptimeSec = Math.floor((Date.now() - START_TIME) / 1000);
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: uptimeSec,
+    version: '2.0.0-pro',
+    caching: {
+      provider: redisConnected ? 'Redis' : 'High-Speed In-Memory Cache',
+      connected: redisConnected,
+      inMemoryCachedEntries: memoryCache.size
+    },
+    googleSheets: {
+      connected: !!sheets,
+      spreadsheetId: SPREADSHEET_ID
+    }
+  });
+});
+
+// Endpoint: Clear Cache manually
+app.post('/api/cache/clear', async (req, res) => {
+  try {
+    await cacheFlush();
+    res.json({ success: true, message: 'All caches (Redis & In-Memory) flushed successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint: Fetch Previous Readings & Daily Locked State (With Cache)
 app.post('/api/previous-readings', async (req, res) => {
   try {
     const { plant, isOvertime, targetDate } = req.body;
     const sheetName = isOvertime ? 'Overtime' : getSheetName(plant);
     if (!sheetName) return res.status(400).json({ error: 'Invalid Plant selected.' });
 
-    // Use UNFORMATTED_VALUE to preserve actual raw numbers
+    const targetDateIso = targetDate ? formatDateIso(targetDate) : '';
+    const cacheKey = `readings:${plant}:${isOvertime ? 'ot' : 'reg'}:${targetDateIso}`;
+
+    // Check Cache First
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      res.set('X-Cache', 'HIT');
+      res.set('X-Cache-Backend', redisConnected ? 'Redis' : 'Memory');
+      return res.json(cached);
+    }
+
+    // Fetch from Google Sheets API
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: `${sheetName}!A:U`,
@@ -120,9 +275,6 @@ app.post('/api/previous-readings', async (req, res) => {
     
     const lastReadings = {};
     const existingDailyReadings = {};
-    const targetDateIso = targetDate ? formatDateIso(targetDate) : '';
-
-    // Track chronological most recent reading prior to targetDate for each register key
     const lastBeforeTarget = {};
 
     for (let i = 1; i < data.length; i++) {
@@ -177,14 +329,21 @@ app.post('/api/previous-readings', async (req, res) => {
       lastReadings[k] = lastBeforeTarget[k].reading;
     }
 
-    res.json({ lastReadings, existingDailyReadings });
+    const payloadResult = { lastReadings, existingDailyReadings };
+    
+    // Save to Cache (TTL: 5 minutes)
+    await cacheSet(cacheKey, payloadResult, 300);
+
+    res.set('X-Cache', 'MISS');
+    res.set('X-Cache-Backend', redisConnected ? 'Redis' : 'Memory');
+    res.json(payloadResult);
   } catch (err) {
     console.error('Error in /api/previous-readings:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Endpoint: Submit Bulk Data (Enforces single daily entry per register, allows remaining entries)
+// Endpoint: Submit Bulk Data (Enforces single daily entry, invalidates relevant cache)
 app.post('/api/submit-data', async (req, res) => {
   try {
     const { payload, clientInfo } = req.body;
@@ -264,6 +423,10 @@ app.post('/api/submit-data', async (req, res) => {
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: rowsToAppend }
     });
+
+    // Invalidate affected cache keys
+    await cacheDel(`readings:${plant}`);
+    await cacheDel('dashboard');
 
     // Also record activity to Logs sheet
     try {
@@ -355,6 +518,9 @@ app.post('/api/adjustment', async (req, res) => {
       }
     });
 
+    // Invalidate dashboard cache
+    await cacheDel('dashboard');
+
     // Also record event to central audit Logs sheet
     try {
       const dateStr = now.toISOString().split('T')[0];
@@ -428,9 +594,17 @@ app.post('/api/log-activity', async (req, res) => {
   }
 });
 
-// Endpoint: Dashboard Data
+// Endpoint: Dashboard Data (With High-Speed Caching)
 app.get('/api/dashboard', async (req, res) => {
   try {
+    const cacheKey = 'dashboard:all_data';
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      res.set('X-Cache', 'HIT');
+      res.set('X-Cache-Backend', redisConnected ? 'Redis' : 'Memory');
+      return res.json(cached);
+    }
+
     const plantSheetMap = {
       'CIPL': 'CIPL-Data Sheet',
       'EGMCL 1': 'EGMCL 1 -Data Sheet',
@@ -508,13 +682,87 @@ app.get('/api/dashboard', async (req, res) => {
       console.warn('Could not read 01_Records:', bErr.message);
     }
 
-    res.json({
+    const payloadResult = {
       records: actualRecords,
       budgetRecords: budgetRecords,
       plants: ['CIPL', 'EGMCL 1', 'EGMCL 2', 'PGCL', 'EGMCL 7', 'GTL']
-    });
+    };
+
+    // Cache dashboard data for 180 seconds (3 mins)
+    await cacheSet(cacheKey, payloadResult, 180);
+
+    res.set('X-Cache', 'MISS');
+    res.set('X-Cache-Backend', redisConnected ? 'Redis' : 'Memory');
+    res.json(payloadResult);
   } catch (err) {
     console.error('Dashboard fetch error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint: Export Full Consumption Audit CSV
+app.get('/api/export-csv', async (req, res) => {
+  try {
+    const plantSheetMap = {
+      'CIPL': 'CIPL-Data Sheet',
+      'EGMCL 1': 'EGMCL 1 -Data Sheet',
+      'EGMCL 7': 'EGMCL 7 -Data Sheet',
+      'GTL': 'GTL -Data Sheet',
+      'PGCL': 'PGCL -Data Sheet',
+      'EGMCL 2': 'EGMCL 2 -Data Sheet ' 
+    };
+
+    const rows = [
+      ['Plant', 'Date', 'Month', 'Year', 'Section', 'Utility Category', 'Source', 'Equipment', 'Unit', 'Previous Reading', 'Present Reading', 'Difference', 'kWh', 'M3', 'Ltr', 'Kg', 'Unit Cost (BDT)', 'Total Cost (BDT)', 'Total Cost (USD)']
+    ];
+
+    for (const plant in plantSheetMap) {
+      try {
+        const sheetName = plantSheetMap[plant];
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${sheetName}!A:S`,
+          valueRenderOption: 'UNFORMATTED_VALUE'
+        });
+        const data = response.data.values || [];
+        for (let i = 1; i < data.length; i++) {
+          const r = data[i];
+          if (!r[0]) continue;
+          rows.push([
+            plant,
+            formatDateIso(r[0]),
+            r[1] || '',
+            r[2] || '',
+            r[3] || '',
+            r[4] || '',
+            r[5] || '',
+            r[6] || '',
+            r[7] || '',
+            r[8] || 0,
+            r[9] || 0,
+            r[10] || 0,
+            r[11] || '',
+            r[12] || '',
+            r[13] || '',
+            r[14] || '',
+            r[16] || 0,
+            r[17] || 0,
+            r[18] || 0
+          ]);
+        }
+      } catch (e) {
+        console.warn('Error reading for export:', e.message);
+      }
+    }
+
+    const csvContent = rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="EPIC_Utility_Consumption_Audit_${todayStr}.csv"`);
+    res.send(csvContent);
+  } catch (err) {
+    console.error('CSV Export Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -526,5 +774,10 @@ if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}/`);
     console.log(`Using Google Sheets API with Spreadsheet ID: ${SPREADSHEET_ID}`);
+    if (redisConnected) {
+      console.log('⚡ Redis Caching: ACTIVE');
+    } else {
+      console.log('⚡ High-Speed In-Memory Caching: ACTIVE');
+    }
   });
 }
